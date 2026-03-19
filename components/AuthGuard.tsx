@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-const BASE = "/UnitedFamilyCaregivers";
-
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const router = useRouter();
@@ -14,7 +12,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        router.replace(`${BASE}/login`);
+        router.replace("/login");
         return;
       }
       setReady(true);

@@ -7,13 +7,12 @@ import { createClient } from "@/lib/supabase/client";
 import { AuthGuard } from "@/components/AuthGuard";
 import { OnboardingTour } from "@/components/OnboardingTour";
 
-const BASE = "/UnitedFamilyCaregivers";
 const nav = [
-  { href: `${BASE}/dashboard`, label: "Home" },
-  { href: `${BASE}/dashboard/chat`, label: "Chat" },
-  { href: `${BASE}/dashboard/profile`, label: "Profile" },
-  { href: `${BASE}/dashboard/documents`, label: "Documents" },
-  { href: `${BASE}/dashboard/calls`, label: "Calls" },
+  { href: "/dashboard", label: "Home" },
+  { href: "/dashboard/chat", label: "Chat" },
+  { href: "/dashboard/profile", label: "Profile" },
+  { href: "/dashboard/documents", label: "Documents" },
+  { href: "/dashboard/calls", label: "Calls" },
 ];
 
 export default function DashboardLayout({
@@ -30,7 +29,7 @@ export default function DashboardLayout({
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        router.replace(`${BASE}/login`);
+        router.replace("/login");
         return;
       }
       setReady(true);
@@ -66,8 +65,8 @@ export default function DashboardLayout({
 
   return (
     <AuthGuard>
-      <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950">
-        <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+      <div className="min-h-screen flex flex-col bg-slate-50">
+        <header className="border-b border-slate-200 bg-white shadow-sm">
           <nav className="flex gap-4 px-4 py-3 max-w-4xl mx-auto" data-onboarding-nav>
             {nav.map((item) => (
               <Link
@@ -75,8 +74,8 @@ export default function DashboardLayout({
                 href={item.href}
                 className={`text-sm font-medium ${
                   pathname === item.href
-                    ? "text-zinc-900 dark:text-zinc-100"
-                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    ? "text-slate-900"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
                 {item.label}
