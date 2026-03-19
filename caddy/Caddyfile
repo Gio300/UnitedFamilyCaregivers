@@ -1,0 +1,24 @@
+# UnitedFamilyCaregivers - Production Caddy
+# Serves ONLY the AI Gateway for this project.
+# Use with Cloudflare Tunnel: tunnel sends traffic here.
+#
+# Frontend: GitHub Pages | Auth/DB: Supabase | VoIP: LiveKit
+# This Caddy: local AI Gateway only (no OpenEMR)
+
+{
+	admin off
+}
+
+# When traffic arrives via Cloudflare Tunnel (api.kloudykare.com or your domain)
+api.kloudykare.com {
+	handle /api/* {
+		reverse_proxy localhost:9900 {
+			stream_timeout 5m
+			request_buffers 64kb
+			response_buffers 64kb
+		}
+	}
+	handle {
+		respond "UnitedFamilyCaregivers API" 200
+	}
+}

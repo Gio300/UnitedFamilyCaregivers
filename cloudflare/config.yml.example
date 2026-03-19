@@ -1,0 +1,17 @@
+# Cloudflare Tunnel config for UnitedFamilyCaregivers
+# 1. Install cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
+# 2. Run: cloudflared tunnel login
+# 3. Run: cloudflared tunnel create ufc-api
+# 4. Copy this file to ~/.cloudflared/config.yml and fill in <TUNNEL_ID>
+# 5. Run: cloudflared tunnel run ufc-api
+#
+# Quick test (no tunnel create): cloudflared tunnel --url http://localhost:8080
+#   This gives a temporary xxx.trycloudflare.com URL
+
+tunnel: <TUNNEL_ID>
+credentials-file: C:\Users\<YOUR_USERNAME>\.cloudflared\<TUNNEL_ID>.json
+
+ingress:
+  - hostname: api.kloudykare.com
+    service: http://localhost:8080
+  - service: http_status:404
