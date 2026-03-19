@@ -62,11 +62,24 @@ caddy run --config Caddyfile.local
 
 ## Cloudflare Tunnel
 
-```bash
-cloudflared tunnel run ufc-api
-```
+1. Copy `cloudflare/config.yml.example` to `~/.cloudflared/config.yml`
+2. Replace `<TUNNEL_ID>` with your tunnel ID from `cloudflared tunnel create ufc-api`
+3. Run: `cloudflared tunnel run ufc-api`
+4. DNS: `api.kloudykare.com` CNAME to `<tunnel-id>.cfargotunnel.com`
 
-DNS: `api.kloudykare.com` CNAME to `<tunnel-id>.cfargotunnel.com`
+Tunnel forwards to Caddy on localhost:8080.
+
+## LiveKit
+
+- Project: `unitedfamilycaregivers-gwsxsuvp.livekit.cloud`
+- Add `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` to `ai-gateway/.env`
+
+## Startup Order
+
+1. Ollama (background)
+2. AI Gateway: `cd ai-gateway && npm start` (PORT=9905)
+3. Caddy: `caddy run --config caddy/Caddyfile.local` (port 8080)
+4. Cloudflare: `cloudflared tunnel run ufc-api`
 
 ## Chat with Tools
 
