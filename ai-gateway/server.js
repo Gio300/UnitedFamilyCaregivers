@@ -3,8 +3,9 @@ const express = require("express");
 const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
 const ollama = require("./ollama");
+const { TOOL_DEFINITIONS, executeTool } = require("./tools");
 
-const PORT = process.env.PORT || 9900;
+const PORT = process.env.PORT || 9905;
 const HOST = process.env.HOST || "0.0.0.0";
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -56,8 +57,9 @@ app.post("/api/chat", requireAuth, async (req, res) => {
 
     const wantsStream =
       req.get("Accept") === "text/event-stream" || req.query.stream === "1";
+    const useTools = req.query.tools === "1";
 
-    if (wantsStream) {
+    if (wantsStream && !useTools) {
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
@@ -78,6 +80,28 @@ app.post("/api/chat", requireAuth, async (req, res) => {
       } finally {
         res.end();
       }
+      return;
+    }
+
+    if (useTools) {
+      const token = req.headers.authorization?.startsWith("Bearer ")
+        ? req.headers.authorization.slice(7)
+        : null;
+      const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      });
+      const executeToolFn = async (name, args, userId) => {
+        return executeTool(name, args, supabaseWithAuth, userId);
+      };
+      const content = await ollama.generateWithTools(
+        message,
+        history,
+        userContext,
+        TOOL_DEFINITIONS,
+        executeToolFn,
+        req.user.id
+      );
+      res.json({ content });
       return;
     }
 

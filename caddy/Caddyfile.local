@@ -5,7 +5,7 @@
 
 :8080 {
 	handle /api/* {
-		reverse_proxy localhost:9900 {
+		reverse_proxy localhost:9905 {
 			stream_timeout 5m
 		}
 	}

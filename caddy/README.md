@@ -4,7 +4,7 @@ This Caddy config serves only the AI Gateway for this project. It is separate fr
 
 ## Routes
 
-- `/api/*` → AI Gateway (localhost:9900)
+- `/api/*` → AI Gateway (localhost:9905)
 
 ## Files
 

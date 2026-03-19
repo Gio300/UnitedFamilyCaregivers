@@ -12,7 +12,7 @@
 # When traffic arrives via Cloudflare Tunnel (api.kloudykare.com or your domain)
 api.kloudykare.com {
 	handle /api/* {
-		reverse_proxy localhost:9900 {
+		reverse_proxy localhost:9905 {
 			stream_timeout 5m
 			request_buffers 64kb
 			response_buffers 64kb

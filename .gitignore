@@ -41,3 +41,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# cloudflare tunnel outputs
+cloudflare-tunnel-*.txt
+
+# supabase temp
+supabase/.temp/

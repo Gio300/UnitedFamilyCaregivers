@@ -1,5 +1,6 @@
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
-const MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
+const MODEL_FAST = process.env.OLLAMA_MODEL_FAST || process.env.OLLAMA_MODEL || "llama3.2:3b";
+const MODEL_SMART = process.env.OLLAMA_MODEL_SMART || "llama3.3";
 
 const SYSTEM_PROMPT = `You are a helpful assistant for United Family Caregivers (NV Care Solutions Inc.), an agency serving Nevada and Arizona.
 
@@ -23,7 +24,7 @@ async function generate(prompt, history = [], userContext = null) {
   const response = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, messages, stream: false }),
+    body: JSON.stringify({ model: MODEL_FAST, messages, stream: false }),
   });
 
   if (!response.ok) {
@@ -48,7 +49,7 @@ async function generateStream(prompt, history = [], userContext = null, onToken)
   const response = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, messages, stream: true }),
+    body: JSON.stringify({ model: MODEL_FAST, messages, stream: true }),
   });
 
   if (!response.ok) {
@@ -92,6 +93,25 @@ async function generateStream(prompt, history = [], userContext = null, onToken)
   return fullContent;
 }
 
+async function generateWithModel(model, prompt, history = []) {
+  const messages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...history.map((m) => ({ role: m.role, content: m.content })),
+    { role: "user", content: prompt },
+  ];
+  const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages, stream: false }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Ollama error: ${response.status} ${err}`);
+  }
+  const data = await response.json();
+  return data.message?.content || "";
+}
+
 const EXTRACT_CALL_NOTE_PROMPT = `Extract call note fields from the following text. Return ONLY valid JSON with these exact keys: call_reason, disposition, notes.
 - call_reason: brief reason for the call (e.g. "Inquiry about payment schedule")
 - disposition: outcome (e.g. "Resolved", "Pending", "Follow-up needed")
@@ -101,7 +121,7 @@ Text to extract from:`;
 
 async function extractCallNoteFromText(text) {
   const fullPrompt = `${EXTRACT_CALL_NOTE_PROMPT}\n\n${text}`;
-  const response = await generate(fullPrompt, []);
+  const response = await generateWithModel(MODEL_SMART, fullPrompt, []);
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     return { call_reason: null, disposition: null, notes: text.slice(0, 2000) };
@@ -118,4 +138,56 @@ async function extractCallNoteFromText(text) {
   }
 }
 
-module.exports = { generate, generateStream, extractCallNoteFromText };
+async function generateWithTools(prompt, history, userContext, tools, executeToolFn, userId, maxIterations = 5) {
+  const systemPrompt = userContext
+    ? `${SYSTEM_PROMPT}\n\nUser context: ${JSON.stringify(userContext)}. You have access to tools - use them when appropriate.`
+    : `${SYSTEM_PROMPT}\n\nYou have access to tools - use them when appropriate.`;
+  let messages = [
+    { role: "system", content: systemPrompt },
+    ...history.map((m) => ({ role: m.role, content: m.content })),
+    { role: "user", content: prompt },
+  ];
+
+  for (let i = 0; i < maxIterations; i++) {
+    const body = { model: MODEL_FAST, messages, stream: false };
+    if (tools && tools.length > 0) body.tools = tools;
+
+    const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Ollama error: ${response.status} ${err}`);
+    }
+    const data = await response.json();
+    const msg = data.message;
+    if (!msg) return "";
+
+    const toolCalls = msg.tool_calls || [];
+    if (toolCalls.length === 0) {
+      return msg.content || "";
+    }
+
+    messages.push({ role: "assistant", content: msg.content || "", tool_calls: toolCalls });
+    for (const tc of toolCalls) {
+      const fn = tc.function || tc;
+      const name = fn.name;
+      let args = {};
+      try {
+        args = typeof fn.arguments === "string" ? JSON.parse(fn.arguments || "{}") : fn.arguments || {};
+      } catch (_) {}
+      const result = await executeToolFn(name, args, userId);
+      messages.push({
+        role: "tool",
+        content: result,
+        ...(tc.id && { tool_call_id: tc.id }),
+        ...(name && { tool_name: name }),
+      });
+    }
+  }
+  return "(Max tool iterations reached)";
+}
+
+module.exports = { generate, generateStream, generateWithTools, extractCallNoteFromText, MODEL_FAST, MODEL_SMART };
