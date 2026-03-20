@@ -108,18 +108,18 @@ export function DocumentsPIP({ onClose }: DocumentsPIPProps) {
   return (
     <PIPWindow title="Documents & Attachments" onClose={onClose} defaultWidth={400} defaultHeight={460}>
       <div className="space-y-4">
-        <div className="flex gap-2 border-b border-slate-200 dark:border-slate-600 pb-2">
+        <div className="flex gap-2 border-b border-slate-200 dark:border-zinc-600 pb-2">
           <button
             type="button"
             onClick={() => setTab("upload")}
-            className={`px-3 py-2 rounded-lg text-sm font-medium ${tab === "upload" ? "bg-emerald-600 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"}`}
+            className={`px-3 py-2 rounded-lg text-sm font-medium ${tab === "upload" ? "bg-emerald-600 text-white ring-2 ring-black/10 dark:ring-white/10" : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-slate-300"}`}
           >
             Upload to profile
           </button>
           <button
             type="button"
             onClick={() => setTab("attach")}
-            className={`px-3 py-2 rounded-lg text-sm font-medium ${tab === "attach" ? "bg-emerald-600 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"}`}
+            className={`px-3 py-2 rounded-lg text-sm font-medium ${tab === "attach" ? "bg-emerald-600 text-white ring-2 ring-black/10 dark:ring-white/10" : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-slate-300"}`}
           >
             Attach to message
           </button>
@@ -130,7 +130,7 @@ export function DocumentsPIP({ onClose }: DocumentsPIPProps) {
             {(isStaff || clients.length > 1) && (
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Client</label>
-                <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm">
+                <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full rounded-lg border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100">
                   <option value="">Select client…</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>{c.full_name}</option>
@@ -140,7 +140,7 @@ export function DocumentsPIP({ onClose }: DocumentsPIPProps) {
             )}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Section</label>
-              <select value={section} onChange={(e) => setSection(e.target.value)} className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm">
+              <select value={section} onChange={(e) => setSection(e.target.value)} className="w-full rounded-lg border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100">
                 <option value="">Select section…</option>
                 {SECTIONS.map((s) => (
                   <option key={s} value={s}>{s}</option>
@@ -149,11 +149,11 @@ export function DocumentsPIP({ onClose }: DocumentsPIPProps) {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">File</label>
-              <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm" />
+              <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full rounded-lg border border-slate-300 dark:border-zinc-600 px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Notes</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm" placeholder="Optional notes…" />
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full rounded-lg border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100" placeholder="Optional notes…" />
             </div>
             <button type="button" onClick={handleUpload} disabled={!file || !section || uploading} className="w-full py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium disabled:opacity-50">
               {uploading ? "Uploading…" : "Upload"}
@@ -165,10 +165,10 @@ export function DocumentsPIP({ onClose }: DocumentsPIPProps) {
           <>
             <p className="text-sm text-slate-600 dark:text-slate-400">Select files to attach to your next message.</p>
             <input ref={fileInputRef} type="file" multiple className="hidden" />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-2 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-emerald-500 text-sm">
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-2 rounded-lg border-2 border-dashed border-slate-300 dark:border-zinc-600 text-slate-600 dark:text-slate-400 hover:border-emerald-500 text-sm">
               Choose files
             </button>
-            <button type="button" onClick={handleAttach} className="w-full py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium">
+            <button type="button" onClick={handleAttach} className="w-full py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium ring-2 ring-black/10 dark:ring-white/10">
               Attach & send
             </button>
           </>

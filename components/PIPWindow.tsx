@@ -40,7 +40,7 @@ export function PIPWindow({ title, onClose, children, defaultWidth = 400, defaul
   return (
     <div
       ref={containerRef}
-      className="fixed z-50 rounded-xl border border-slate-200 bg-white shadow-xl flex flex-col overflow-hidden"
+      className="fixed z-50 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl flex flex-col overflow-hidden"
       style={{
         left: position.x,
         top: position.y,
@@ -49,14 +49,14 @@ export function PIPWindow({ title, onClose, children, defaultWidth = 400, defaul
       }}
     >
       <div
-        className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50 cursor-move"
+        className="flex items-center justify-between px-4 py-2 border-b border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 cursor-move"
         onMouseDown={handleDragStart}
       >
-        <h3 className="font-medium text-slate-800">{title}</h3>
+        <h3 className="font-medium text-slate-800 dark:text-slate-100">{title}</h3>
         <button
           type="button"
           onClick={onClose}
-          className="p-1 rounded text-slate-500 hover:text-slate-700 hover:bg-slate-200"
+          className="p-1 rounded text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-zinc-700"
           aria-label="Close"
         >
           ×

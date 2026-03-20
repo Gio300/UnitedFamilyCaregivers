@@ -10,8 +10,8 @@ export function RightSidebar() {
   const [tab, setTab] = useState<RightTab>("notes");
 
   return (
-    <aside className="w-72 shrink-0 border-l border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-800/50 flex flex-col">
-      <div className="p-2 border-b border-slate-700/50 flex items-center justify-between">
+    <aside className="w-72 shrink-0 border-l border-slate-200 dark:border-zinc-700/50 bg-white dark:bg-zinc-900/95 flex flex-col">
+      <div className="p-2 border-b border-slate-200 dark:border-zinc-700/50 flex items-center justify-between">
         <div className="flex gap-1 flex-wrap">
           {(["notes", "messenger", "tools", "mode"] as const).map((t) => (
             <button
@@ -29,7 +29,7 @@ export function RightSidebar() {
         <button
           type="button"
           onClick={() => setRightSidebarOpen(false)}
-          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-zinc-700/50 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
           aria-label="Close"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

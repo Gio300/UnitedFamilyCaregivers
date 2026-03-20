@@ -59,12 +59,12 @@ export function ModeBar() {
   const acc = ACCENT_CLASSES[accentColor] || ACCENT_CLASSES.emerald;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 border-t border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur py-2 px-4 flex items-center justify-between z-30" data-onboarding-modes>
+    <div className="fixed bottom-0 left-0 right-0 border-t border-slate-200 dark:border-zinc-700 bg-white/95 dark:bg-black/95 backdrop-blur py-2 px-4 flex items-center justify-between z-30" data-onboarding-modes>
       <div className="flex items-center gap-2" ref={dropdownRef}>
         <button
           type="button"
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${acc.active}`}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ring-2 ring-black/10 dark:ring-white/10 ${acc.active}`}
         >
           <span>{current?.label ?? mode}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -72,7 +72,7 @@ export function ModeBar() {
           </svg>
         </button>
         {dropdownOpen && (
-          <div className="absolute bottom-full left-4 mb-2 w-56 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl py-1 z-50">
+          <div className="absolute bottom-full left-4 mb-2 w-56 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl py-1 z-50">
             {MODES.filter((m) => visibleModes.includes(m.id)).map((m) => (
               <button
                 key={m.id}
@@ -81,8 +81,8 @@ export function ModeBar() {
                   setMode(m.id);
                   setDropdownOpen(false);
                 }}
-                className={`flex items-center gap-2 w-full px-4 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700 ${
-                  mode === m.id ? "bg-slate-100 dark:bg-slate-700 font-medium" : ""
+                className={`flex items-center gap-2 w-full px-4 py-2 text-sm text-left text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-zinc-700 ${
+                  mode === m.id ? "bg-slate-100 dark:bg-zinc-700 font-medium" : ""
                 }`}
               >
                 <span className="text-slate-500 dark:text-slate-400">{m.icon}</span>

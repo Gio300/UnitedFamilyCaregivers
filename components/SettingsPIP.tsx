@@ -72,7 +72,7 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
               type="button"
               onClick={() => setTheme("light")}
               className={`px-3 py-2 rounded-lg text-sm ${
-                theme === "light" ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-500" : "border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400"
+                theme === "light" ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-500" : "border border-slate-300 dark:border-zinc-600 text-slate-600 dark:text-slate-400"
               }`}
             >
               Light
@@ -81,7 +81,7 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
               type="button"
               onClick={() => setTheme("dark")}
               className={`px-3 py-2 rounded-lg text-sm ${
-                theme === "dark" ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-500" : "border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400"
+                theme === "dark" ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-500" : "border border-slate-300 dark:border-zinc-600 text-slate-600 dark:text-slate-400"
               }`}
             >
               Dark
@@ -96,7 +96,7 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
                 key={o.id}
                 type="button"
                 onClick={() => setAccentColor(o.id)}
-                className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${
+                className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 border border-slate-200 dark:border-zinc-600 ${
                   accentColor === o.id ? "ring-2 ring-offset-2 ring-slate-400 dark:ring-slate-500" : ""
                 }`}
               >
@@ -115,7 +115,7 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
                 type="button"
                 onClick={() => setDeviceType(d)}
                 className={`px-3 py-2 rounded-lg text-sm capitalize ${
-                  deviceType === d ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-500" : "border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400"
+                  deviceType === d ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-500" : "border border-slate-300 dark:border-zinc-600 text-slate-600 dark:text-slate-400"
                 }`}
               >
                 {d}
@@ -132,7 +132,7 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
                 type="button"
                 onClick={() => setTextSize(t)}
                 className={`px-3 py-2 rounded-lg text-sm capitalize ${
-                  textSize === t ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-500" : "border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400"
+                  textSize === t ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-500" : "border border-slate-300 dark:border-zinc-600 text-slate-600 dark:text-slate-400"
                 }`}
               >
                 {t}
@@ -145,10 +145,10 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
             Reset to default
           </button>
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 dark:border-zinc-600 text-slate-700 dark:text-slate-300 text-sm">
               Cancel
             </button>
-            <button type="button" onClick={handleApply} className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">
+            <button type="button" onClick={handleApply} className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 ring-2 ring-black/10 dark:ring-white/10">
               Save
             </button>
           </div>

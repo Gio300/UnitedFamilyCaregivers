@@ -44,4 +44,6 @@ This drops and recreates all tables. Use only if you have no data to keep.
 
 1. Restart the app or refresh the page
 2. Settings (theme, mode, etc.) should work
-3. The mode bar should show all modes for managers
+3. The mode bar should show all modes for managers (csr_admin, management_admin)
+
+**Note:** If profile fetch returns 406, the mode bar falls back to Messenger and EVV only. Fix the schema first so managers see Customer Service, Appointments, and Supervisor.
