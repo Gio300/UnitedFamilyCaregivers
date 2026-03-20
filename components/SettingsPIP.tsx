@@ -15,14 +15,13 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase.from("profiles").select("device_type, text_size, theme, accent_color").eq("id", user.id).single().then(({ data }) => {
-          if (data?.device_type) setDeviceType(data.device_type as "desktop" | "tablet" | "mobile");
-          if (data?.text_size) setTextSize(data.text_size as "small" | "medium" | "large");
-          if (data?.theme) setTheme((data.theme as Theme) || "light");
-          if (data?.accent_color) setAccentColor((data.accent_color as AccentColor) || "emerald");
-        }).catch(() => {});
-      }
+      if (!user) return;
+      supabase.from("profiles").select("device_type, text_size, theme, accent_color").eq("id", user.id).single().then(({ data }) => {
+        if (data?.device_type) setDeviceType(data.device_type as "desktop" | "tablet" | "mobile");
+        if (data?.text_size) setTextSize(data.text_size as "small" | "medium" | "large");
+        if (data?.theme) setTheme((data.theme as Theme) || "light");
+        if (data?.accent_color) setAccentColor((data.accent_color as AccentColor) || "emerald");
+      });
     });
   }, [supabase]);
 
@@ -35,7 +34,7 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
           text_size: textSize,
           theme: theme,
           accent_color: accentColor,
-        }).eq("id", user.id).then(() => {});
+        }).eq("id", user.id);
       }
     });
     onClose();
@@ -50,7 +49,7 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
           text_size: "medium",
           theme: "light",
           accent_color: "emerald",
-        }).eq("id", user.id).then(() => {}).catch(() => {});
+        }).eq("id", user.id);
       }
     });
     onClose();
