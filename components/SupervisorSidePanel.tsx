@@ -3,9 +3,9 @@
 import { useApp } from "@/context/AppContext";
 
 export function SupervisorSidePanel() {
-  const { mode, openPIP } = useApp();
+  const { userRole, openPIP } = useApp();
 
-  if (mode !== "supervisor") return null;
+  if (userRole !== "management_admin") return null;
 
   return (
     <aside className="w-80 border-l border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-auto shrink-0">

@@ -5,13 +5,15 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
+import { useMessageCenterUnread } from "@/hooks/useMessageCenterUnread";
 
 interface ToolbarProps {
   onSettingsClick?: () => void;
 }
 
 export function Toolbar({ onSettingsClick }: ToolbarProps) {
-  const { theme, setTheme, accentColor, setLeftSidebarOpen, setRightSidebarOpen, leftSidebarOpen, rightSidebarOpen, resetChat, openPIP } = useApp();
+  const { theme, setTheme, accentColor, setLeftSidebarOpen, leftSidebarOpen, resetChat, openPIP } = useApp();
+  const { count: messageCenterCount } = useMessageCenterUnread();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userName, setUserName] = useState<string>("User");
   const [pendingCount, setPendingCount] = useState(0);
@@ -118,15 +120,20 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
         )}
         <button
           type="button"
-          onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-          className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
-          title={rightSidebarOpen ? "Hide right panel" : "Show right panel"}
-          aria-label="Toggle right panel"
+          onClick={() => openPIP("message_center")}
+          className="relative p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
+          title="Message center"
+          aria-label="Message center"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="2" y="4" width="8" height="16" rx="1" opacity="0.5" />
-            <rect x="12" y="4" width="10" height="16" rx="1" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
+          {messageCenterCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {messageCenterCount > 99 ? "99+" : messageCenterCount}
+            </span>
+          )}
         </button>
         <button
           type="button"

@@ -6,10 +6,9 @@ import { CustomerServiceSidePanel } from "@/components/CustomerServiceSidePanel"
 import { EligibilitySidePanel } from "@/components/EligibilitySidePanel";
 import { SupervisorSidePanel } from "@/components/SupervisorSidePanel";
 import { ChatHistorySidebar } from "@/components/ChatHistorySidebar";
-import { RightSidebar } from "@/components/RightSidebar";
 
 export function DashboardMainContent() {
-  const { leftSidebarOpen, rightSidebarOpen } = useApp();
+  const { leftSidebarOpen } = useApp();
 
   return (
     <>
@@ -22,7 +21,6 @@ export function DashboardMainContent() {
         <EligibilitySidePanel />
         <SupervisorSidePanel />
       </div>
-      {rightSidebarOpen && <RightSidebar />}
     </>
   );
 }

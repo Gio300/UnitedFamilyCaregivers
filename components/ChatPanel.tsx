@@ -13,7 +13,7 @@ interface Message {
 }
 
 export function ChatPanel() {
-  const { mode, openPIP, chatResetKey, accentColor, addChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments, activeClientId } = useApp();
+  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments, activeClientId } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
@@ -153,7 +153,7 @@ export function ChatPanel() {
       }
 
       const history = messages.map(({ role, content }) => ({ role, content }));
-      const useTools = mode === "eligibility" || mode === "customer_service" || mode === "appointments";
+      const useTools = userRole === "csr_admin" || userRole === "management_admin";
       const res = await fetch(`${apiBase}/api/chat?stream=1${useTools ? "&tools=1" : ""}`, {
         method: "POST",
         headers: {
@@ -165,7 +165,7 @@ export function ChatPanel() {
           message: userMsg.content,
           history,
           attachments: userMsg.attachments,
-          userContext: { mode, activeClientId: activeClientId || undefined },
+          userContext: { role: userRole || undefined, activeClientId: activeClientId || undefined },
         }),
       });
 
@@ -312,7 +312,7 @@ export function ChatPanel() {
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
           </svg>
         </button>
-        {(mode === "customer_service" || mode === "eligibility") && (
+        {(userRole === "csr_admin" || userRole === "management_admin") && (
           <button
             type="button"
             onClick={() => openPIP("eligibility")}
@@ -373,13 +373,9 @@ export function ChatPanel() {
               }
             }}
             placeholder={
-              mode === "eligibility" ? "e.g. Check eligibility for @ClientName (need DOB, recipient ID or SSN)" :
-              mode === "customer_service" ? "Client help, eligibility, documents. Use @ for users, # for actions." :
-              mode === "supervisor" ? "Approve requests, team oversight. Use @ for users." :
-              mode === "appointments" ? "Schedule or manage appointments." :
-              mode === "evv" ? "EVV visit verification, time tracking." :
-              mode === "messenger" ? "DMs, calls, emails. Use @ for users, # for actions." :
-              "Type a message... Use @ for users, # for actions (dm, email, reminder, appointment, call)"
+              userRole === "csr_admin" || userRole === "management_admin"
+                ? "Client help, eligibility, documents. Use @ for users, # for actions."
+                : "Type a message... Use @ for users, # for actions (dm, email, reminder, appointment, call)"
             }
             rows={1}
             className="w-full min-h-[40px] max-h-[200px] rounded-lg border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm resize-y overflow-y-auto"

@@ -14,9 +14,8 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
       showProgress: true,
       steps: [
         { element: "body", popover: { title: "Welcome to UFCi", description: "This is your main workspace. Chat is front and center.", side: "bottom", align: "center" } },
-        { element: "[data-onboarding-chat]", popover: { title: "Chat", description: "Send messages here. Everything flows through chat.", side: "right", align: "start" } },
-        { element: "[data-onboarding-modes]", popover: { title: "Modes", description: "Switch between Messenger, Customer Service, Appointments, and more.", side: "top", align: "center" } },
-        { element: "body", popover: { title: "All set!", description: "Use the documents icon to upload files. Click your name for Profile.", side: "bottom", align: "center" } },
+        { element: "[data-onboarding-chat]", popover: { title: "Chat", description: "Send messages here. Chat adapts to your role (client, caregiver, admin).", side: "right", align: "start" } },
+        { element: "body", popover: { title: "All set!", description: "Use the bell icon for Message Center. Documents icon for uploads. Click your name for Profile.", side: "bottom", align: "center" } },
       ],
       onDestroyed: () => onComplete(),
     });

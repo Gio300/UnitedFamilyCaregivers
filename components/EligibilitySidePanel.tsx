@@ -8,14 +8,14 @@ import { getApiBase } from "@/lib/api";
 const MEDICAID_URL = "https://www.medicaid.nv.gov/hcp/provider/Home/tabid/135/Default.aspx";
 
 export function EligibilitySidePanel() {
-  const { mode, openPIP } = useApp();
+  const { userRole, openPIP } = useApp();
   const [mfaCode, setMfaCode] = useState<string>("—");
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
-    if (mode !== "eligibility") return;
+    if (userRole !== "csr_admin" && userRole !== "management_admin") return;
     const apiBase = getApiBase();
     if (!apiBase) {
       setMfaCode("—");
@@ -39,7 +39,7 @@ export function EligibilitySidePanel() {
     fetchTotp();
     const interval = setInterval(fetchTotp, 10000);
     return () => clearInterval(interval);
-  }, [mode, supabase]);
+  }, [userRole, supabase]);
 
   async function openPortal() {
     const apiBase = getApiBase();
@@ -65,7 +65,7 @@ export function EligibilitySidePanel() {
     }
   }
 
-  if (mode !== "eligibility") return null;
+  if (userRole !== "csr_admin" && userRole !== "management_admin") return null;
 
   return (
     <aside className="w-80 border-l border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-auto shrink-0">

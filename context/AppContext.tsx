@@ -1,10 +1,11 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export type AppMode = "chat" | "notes" | "messenger" | "evv" | "customer_service" | "appointments" | "supervisor" | "eligibility";
 
-export type PIPType = "settings" | "eligibility" | "document" | "expand" | "activity" | "supervisor_approval" | null;
+export type PIPType = "settings" | "eligibility" | "document" | "expand" | "activity" | "supervisor_approval" | "message_center" | null;
 
 export type Theme = "light" | "dark";
 
@@ -23,6 +24,7 @@ export interface ChatSession {
 }
 
 interface AppContextValue {
+  userRole: string | null;
   mode: AppMode;
   setMode: (mode: AppMode) => void;
   pipType: PIPType;
@@ -58,6 +60,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [mode, setMode] = useState<AppMode>("chat");
   const [pipType, setPipType] = useState<PIPType>(null);
   const [expandContent, setExpandContent] = useState<ExpandPIPContent | null>(null);
@@ -180,6 +183,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data }) => {
+        setUserRole(data?.role ?? null);
+      });
+    });
+  }, []);
+
 
   const openPIP = useCallback((type: PIPType, content?: ExpandPIPContent) => {
     setPipType(type);
@@ -194,6 +207,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider
       value={{
+        userRole,
         mode,
         setMode,
         pipType,

@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_encounters_date ON public.encounters(encounter_da
 
 ALTER TABLE public.encounters ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "encounters_all" ON public.encounters;
 CREATE POLICY "encounters_all" ON public.encounters FOR ALL USING (
   EXISTS (SELECT 1 FROM public.client_profiles cp WHERE cp.id = client_id AND (
     cp.user_id = auth.uid() OR cp.caregiver_id = auth.uid() OR
@@ -49,6 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_clinical_notes_encounter ON public.clinical_notes
 
 ALTER TABLE public.clinical_notes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "clinical_notes_all" ON public.clinical_notes;
 CREATE POLICY "clinical_notes_all" ON public.clinical_notes FOR ALL USING (
   EXISTS (
     SELECT 1 FROM public.encounters e
@@ -82,6 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_appointments_start ON public.appointments(start_a
 
 ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "appointments_all" ON public.appointments;
 CREATE POLICY "appointments_all" ON public.appointments FOR ALL USING (
   EXISTS (SELECT 1 FROM public.client_profiles cp WHERE cp.id = client_id AND (
     cp.user_id = auth.uid() OR cp.caregiver_id = auth.uid() OR
@@ -103,10 +106,11 @@ CREATE TABLE IF NOT EXISTS public.client_medications (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_client_medications_client ON public.client_medications(client_id);
+CREATE INDEX IF NOT EXISTS idx_client_medications_client ON public.client_medications(client_id);
 
 ALTER TABLE public.client_medications ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "client_medications_all" ON public.client_medications;
 CREATE POLICY "client_medications_all" ON public.client_medications FOR ALL USING (
   EXISTS (SELECT 1 FROM public.client_profiles cp WHERE cp.id = client_id AND (
     cp.user_id = auth.uid() OR cp.caregiver_id = auth.uid() OR
@@ -130,6 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_client_allergies_client ON public.client_allergie
 
 ALTER TABLE public.client_allergies ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "client_allergies_all" ON public.client_allergies;
 CREATE POLICY "client_allergies_all" ON public.client_allergies FOR ALL USING (
   EXISTS (SELECT 1 FROM public.client_profiles cp WHERE cp.id = client_id AND (
     cp.user_id = auth.uid() OR cp.caregiver_id = auth.uid() OR
@@ -157,6 +162,7 @@ CREATE INDEX IF NOT EXISTS idx_client_vitals_recorded ON public.client_vitals(re
 
 ALTER TABLE public.client_vitals ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "client_vitals_all" ON public.client_vitals;
 CREATE POLICY "client_vitals_all" ON public.client_vitals FOR ALL USING (
   EXISTS (SELECT 1 FROM public.client_profiles cp WHERE cp.id = client_id AND (
     cp.user_id = auth.uid() OR cp.caregiver_id = auth.uid() OR

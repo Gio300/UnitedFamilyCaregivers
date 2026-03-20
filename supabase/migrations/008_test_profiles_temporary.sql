@@ -39,8 +39,10 @@ ALTER TABLE public.test_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.test_client_profiles ENABLE ROW LEVEL SECURITY;
 
 -- Any authenticated user can read test data (temporary for dev)
+DROP POLICY IF EXISTS "test_profiles_select_auth" ON public.test_profiles;
 CREATE POLICY "test_profiles_select_auth" ON public.test_profiles FOR SELECT
   TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "test_client_profiles_select_auth" ON public.test_client_profiles;
 CREATE POLICY "test_client_profiles_select_auth" ON public.test_client_profiles FOR SELECT
   TO authenticated USING (true);

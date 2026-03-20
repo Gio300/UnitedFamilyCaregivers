@@ -22,9 +22,19 @@ const MODE_PROMPTS = {
   eligibility: "User is in Eligibility mode. Help check Nevada Medicaid eligibility. For 'Check eligibility for @Name', you need lastName, firstName, dob, and either recipientId or ssn. The system can run automated eligibility checks.",
 };
 
+const ROLE_PROMPTS = {
+  client: "User is a client. Help with general questions, appointments, services, and their own care information.",
+  caregiver: "User is a caregiver. Help with call notes, activity summaries, DMs, calls, emails, EVV visit verification, and client care. Use @ for users, # for actions (dm, email, reminder, appointment, call).",
+  csr_admin: "User is CSR/admin. Help with client management, eligibility, documents, onboarding, encounters, medications, allergies, notes, and appointments. Use list_clients, list_encounters, list_medications, list_allergies, create_appointment, add_medication, add_allergy as needed. For eligibility, use the eligibility tools.",
+  management_admin: "User is management/supervisor. Help with approvals, oversight, team management, plus all CSR capabilities. Use list_clients, create_appointment, eligibility tools, and supervisor functions.",
+};
+
 function buildSystemPrompt(userContext) {
   let extra = "";
-  if (userContext?.mode && MODE_PROMPTS[userContext.mode]) {
+  const role = userContext?.role;
+  if (role && ROLE_PROMPTS[role]) {
+    extra += `\n\nUser role: ${role}. ${ROLE_PROMPTS[role]}`;
+  } else if (userContext?.mode && MODE_PROMPTS[userContext.mode]) {
     extra += `\n\nCurrent mode: ${userContext.mode}. ${MODE_PROMPTS[userContext.mode]}`;
   }
   if (userContext?.activeClientId) {

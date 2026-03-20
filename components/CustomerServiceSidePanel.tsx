@@ -3,9 +3,9 @@
 import { useApp } from "@/context/AppContext";
 
 export function CustomerServiceSidePanel() {
-  const { mode } = useApp();
+  const { userRole } = useApp();
 
-  if (mode !== "customer_service") return null;
+  if (userRole !== "csr_admin" && userRole !== "management_admin") return null;
 
   return (
     <aside className="w-80 border-l border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-auto shrink-0">
