@@ -1,39 +1,39 @@
-# UFCi Test Users
+# UFCi Test Profiles
 
-Use these test accounts to verify profiles, notes, messages, and role-based features.
+## Option A: Fake Profiles (no logins) – for manager testing
 
-## Step 1: Create Users in Supabase
+Creates caregivers, clients, and CSR as **data only**. You sign in as your manager account and see them in the system. No passwords or logins needed.
 
-1. Open **Supabase Dashboard** → **Authentication** → **Users**
-2. Click **Add user** → **Create new user**
-3. Create these four users (use password `TestPass123!` or any secure password):
+1. Open **Supabase Dashboard** → **SQL Editor**
+2. Run `supabase/seed_test_profiles.sql`
+
+**Creates:**
+- **2 caregivers:** Maria Caregiver, James Caregiver
+- **3 clients:** Alice Client, Bob Client, Carol Client (linked to caregivers)
+- **1 CSR:** Dana CSR
+
+**When done:** Run `supabase/cleanup_test_profiles.sql` to remove all test data.
+
+---
+
+## Option B: Real test accounts (with logins)
+
+For testing as different roles (caregiver, client, CSR, manager):
+
+1. Create users in **Supabase Dashboard** → **Authentication** → **Users** (Add user)
+2. Run `supabase/seed_test_users.sql` in SQL Editor
 
 | Email | Purpose |
 |-------|---------|
 | `test.caregiver@example.com` | Caregiver with assigned client |
 | `test.client@example.com` | Client linked to test caregiver |
-| `test.csr@example.com` | CSR admin (Customer Service, Appointments) |
-| `test.manager@example.com` | Management admin (all modes including Supervisor) |
+| `test.csr@example.com` | CSR admin |
+| `test.manager@example.com` | Management admin (all modes) |
 
-## Step 2: Run the Seed SQL
-
-1. Open **Supabase Dashboard** → **SQL Editor**
-2. Paste and run the contents of `supabase/seed_test_users.sql`
-
-This will:
-
-- Set `full_name` and `role` on each profile
-- Set `approved_at` so users can access the app
-- Create a `client_profiles` row linking Test Client to Test Caregiver
-
-## Step 3: Test
-
-- **test.caregiver@example.com**: Log in, view Test Client profile, leave notes
-- **test.client@example.com**: Log in, view own profile, see caregiver
-- **test.csr@example.com**: Log in, see Customer Service and Appointments modes, manage clients
-- **test.manager@example.com**: Log in, see all modes including Supervisor
+---
 
 ## Notes
 
-- The `handle_new_user` trigger creates a profile row on signup; the seed updates it.
-- If a user already exists, the seed updates their profile. The `client_profiles` insert skips if the link already exists.
+- **Option A** uses `supabase/seed_test_profiles.sql` – creates auth.users + profiles + client_profiles in one run.
+- **Option B** uses `supabase/seed_test_users.sql` – updates profiles for users you create manually.
+- If Option A fails with "permission denied" on auth.users, use Option B instead.
