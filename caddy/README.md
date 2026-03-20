@@ -4,25 +4,22 @@ This Caddy config serves only the AI Gateway for this project. It is separate fr
 
 ## Routes
 
-- `/api/*` → AI Gateway (localhost:9905)
+- `/api/*` → AI Gateway (localhost:7501)
 
 ## Files
 
-- `Caddyfile` - Production (use with Cloudflare Tunnel)
-- `Caddyfile.local` - Local development (port 8080)
+- `Caddyfile.tunnel` - For Cloudflare Tunnel (listens on 8080). Tunnel config: `service: http://localhost:8080`
+- `Caddyfile.local` - Local dev (port 7502). Access: http://localhost:7502
+- `Caddyfile` - Production (api.kloudykare.com)
 
-## Update workflow
-
-When you add/remove API routes or change ports:
-
-1. Edit `Caddyfile` or `Caddyfile.local`
-2. Commit and push
-3. On the host: `caddy reload --config caddy/Caddyfile.local` (or Caddyfile for prod)
-
-## Run locally
+## Run for tunnel
 
 ```bash
-caddy run --config caddy/Caddyfile.local
+caddy run --config caddy/Caddyfile.tunnel
 ```
 
-Ensure the AI Gateway is running on port 9900 before starting Caddy.
+Or: `.\scripts\run-caddy-tunnel.ps1`
+
+Ensure the AI Gateway is running on port 7501, and Cloudflare tunnel points to localhost:8080.
+
+**Note:** You can skip Caddy and point the tunnel directly to 7501: `cloudflared tunnel --url http://localhost:7501`

@@ -18,7 +18,10 @@ Exposes the local AI Gateway (via Caddy) to the internet without port forwarding
 Get a temporary URL for testing:
 
 ```powershell
-# Ensure Caddy is running on 8080 and AI Gateway on 9900
+# Option A: Direct to AI Gateway (simplest)
+cloudflared tunnel --url http://localhost:7501
+
+# Option B: Via Caddy (use when Caddy is on 8080)
 cloudflared tunnel --url http://localhost:8080
 ```
 
@@ -51,5 +54,6 @@ Use the returned `xxx.trycloudflare.com` URL as `NEXT_PUBLIC_API_BASE`.
 ## Flow
 
 ```
-Internet -> Cloudflare -> Tunnel -> Caddy (8080) -> AI Gateway (9900)
+Internet -> Cloudflare -> Tunnel -> Caddy (8080) -> AI Gateway (7501)
+# Or direct: Tunnel -> AI Gateway (7501)
 ```

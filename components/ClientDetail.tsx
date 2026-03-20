@@ -28,13 +28,25 @@ export function ClientDetail({ clientId, onBack }: ClientDetailProps) {
 
   useEffect(() => {
     async function load() {
-      const { data: cp } = await supabase
+      // Try client_profiles first, then test_client_profiles (temporary dev fallback)
+      let cp = (await supabase
         .from("client_profiles")
         .select("full_name, dob, phone, email, address, city, state, zip")
         .eq("id", clientId)
-        .single();
+        .single()).data;
+
+      if (!cp) {
+        const test = (await supabase
+          .from("test_client_profiles")
+          .select("full_name, dob, phone, email, address, city, state, zip")
+          .eq("id", clientId)
+          .single()).data;
+        cp = test;
+      }
+
       setClient(cp || null);
 
+      // encounters, meds, allergies reference client_profiles.id - test clients have none
       const [medRes, allRes, encRes, apptRes] = await Promise.all([
         supabase.from("client_medications").select("name, dosage, instructions").eq("client_id", clientId),
         supabase.from("client_allergies").select("allergen, reaction, severity").eq("client_id", clientId),

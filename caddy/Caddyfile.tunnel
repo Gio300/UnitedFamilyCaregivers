@@ -1,0 +1,21 @@
+# UnitedFamilyCaregivers - Cloudflare Tunnel (port 8080)
+# Tunnel forwards api.kloudykare.com to localhost:8080
+# Run: caddy run --config caddy/Caddyfile.tunnel
+
+{
+	admin off
+}
+
+# Listen on 8080 for Cloudflare Tunnel (config: service: http://localhost:8080)
+:8080 {
+	handle /api/* {
+		reverse_proxy localhost:7501 {
+			stream_timeout 5m
+			request_buffers 64kb
+			response_buffers 64kb
+		}
+	}
+	handle {
+		respond "UnitedFamilyCaregivers API" 200
+	}
+}

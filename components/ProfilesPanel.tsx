@@ -40,10 +40,21 @@ export function ProfilesPanel() {
         return;
       }
 
-      const { data: profs } = await supabase
+      // Try real profiles first
+      let { data: profs } = await supabase
         .from("profiles")
         .select("id, full_name, role, approved_at")
         .order("full_name");
+
+      // Temporary: fallback to test_profiles when no real profiles (for dev/testing)
+      const useTestProfiles = !profs?.length;
+      if (useTestProfiles) {
+        const { data: testProfs } = await supabase
+          .from("test_profiles")
+          .select("id, full_name, role, approved_at")
+          .order("full_name");
+        profs = testProfs || [];
+      }
 
       if (!profs?.length) {
         setProfiles([]);
@@ -56,42 +67,74 @@ export function ProfilesPanel() {
           const row: ProfileRow = { ...p, approved_at: p.approved_at };
 
           if (p.role === "client") {
-            const { data: cp } = await supabase
-              .from("client_profiles")
-              .select("id, caregiver_id")
-              .eq("user_id", p.id)
-              .limit(1)
-              .single();
-            if (cp) {
-              row.client_profile_id = cp.id;
-              if (cp.caregiver_id) {
-                const { data: cg } = await supabase
-                  .from("profiles")
-                  .select("full_name")
-                  .eq("id", cp.caregiver_id)
-                  .single();
-                row.caregiver_name = cg?.full_name || "";
+            if (useTestProfiles) {
+              const { data: cp } = await supabase
+                .from("test_client_profiles")
+                .select("id, caregiver_id")
+                .eq("client_id", p.id)
+                .limit(1)
+                .single();
+              if (cp) {
+                row.client_profile_id = cp.id;
+                if (cp.caregiver_id) {
+                  const { data: cg } = await supabase
+                    .from("test_profiles")
+                    .select("full_name")
+                    .eq("id", cp.caregiver_id)
+                    .single();
+                  row.caregiver_name = cg?.full_name || "";
+                }
+                // test tables don't have encounters/meds/allergies - show 0
+                row.encounter_count = 0;
+                row.medication_count = 0;
+                row.allergy_count = 0;
               }
-              const [enc, med, all] = await Promise.all([
-                supabase.from("encounters").select("id", { count: "exact", head: true }).eq("client_id", cp.id),
-                supabase.from("client_medications").select("id", { count: "exact", head: true }).eq("client_id", cp.id),
-                supabase.from("client_allergies").select("id", { count: "exact", head: true }).eq("client_id", cp.id),
-              ]);
-              row.encounter_count = enc.error ? 0 : (enc.count ?? 0);
-              row.medication_count = med.error ? 0 : (med.count ?? 0);
-              row.allergy_count = all.error ? 0 : (all.count ?? 0);
+            } else {
+              const { data: cp } = await supabase
+                .from("client_profiles")
+                .select("id, caregiver_id")
+                .eq("user_id", p.id)
+                .limit(1)
+                .single();
+              if (cp) {
+                row.client_profile_id = cp.id;
+                if (cp.caregiver_id) {
+                  const { data: cg } = await supabase
+                    .from("profiles")
+                    .select("full_name")
+                    .eq("id", cp.caregiver_id)
+                    .single();
+                  row.caregiver_name = cg?.full_name || "";
+                }
+                const [enc, med, all] = await Promise.all([
+                  supabase.from("encounters").select("id", { count: "exact", head: true }).eq("client_id", cp.id),
+                  supabase.from("client_medications").select("id", { count: "exact", head: true }).eq("client_id", cp.id),
+                  supabase.from("client_allergies").select("id", { count: "exact", head: true }).eq("client_id", cp.id),
+                ]);
+                row.encounter_count = enc.error ? 0 : (enc.count ?? 0);
+                row.medication_count = med.error ? 0 : (med.count ?? 0);
+                row.allergy_count = all.error ? 0 : (all.count ?? 0);
+              }
             }
           }
 
           if (p.role === "caregiver") {
-            const { data: clients } = await supabase
-              .from("client_profiles")
-              .select("full_name, id")
-              .eq("caregiver_id", p.id);
-            row.clients = clients || [];
+            if (useTestProfiles) {
+              const { data: clients } = await supabase
+                .from("test_client_profiles")
+                .select("full_name, id")
+                .eq("caregiver_id", p.id);
+              row.clients = clients || [];
+            } else {
+              const { data: clients } = await supabase
+                .from("client_profiles")
+                .select("full_name, id")
+                .eq("caregiver_id", p.id);
+              row.clients = clients || [];
+            }
           }
 
-          if (p.role === "csr_admin" || p.role === "management_admin") {
+          if ((p.role === "csr_admin" || p.role === "management_admin") && !useTestProfiles) {
             const { data: notes } = await supabase
               .from("call_notes")
               .select("call_reason, disposition, created_at")

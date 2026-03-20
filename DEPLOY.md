@@ -53,21 +53,37 @@ cd ai-gateway
 npm start
 ```
 
-## Caddy (Local)
+## Caddy (for Cloudflare Tunnel)
+
+The tunnel expects Caddy on port **8080**. Use `Caddyfile.tunnel` (not Caddyfile.local):
 
 ```bash
-cd caddy
-caddy run --config Caddyfile.local
+cd UnitedFamilyCaregivers
+.\scripts\run-caddy-tunnel.ps1
 ```
+
+Or manually:
+```bash
+caddy run --config caddy/Caddyfile.tunnel
+```
+
+Caddy listens on 8080 and proxies `/api/*` to AI Gateway (7501).
 
 ## Cloudflare Tunnel
 
+**Quick test** (no config, temporary URL):
+```bash
+cloudflared tunnel --url http://localhost:7501
+```
+Use the returned `xxx.trycloudflare.com` URL as `NEXT_PUBLIC_API_BASE`. No Caddy needed.
+
+**Permanent** (api.kloudykare.com):
 1. Copy `cloudflare/config.yml.example` to `~/.cloudflared/config.yml`
 2. Replace `<TUNNEL_ID>` with your tunnel ID from `cloudflared tunnel create ufc-api`
 3. Run: `cloudflared tunnel run ufc-api`
 4. DNS: `api.kloudykare.com` CNAME to `<tunnel-id>.cfargotunnel.com`
 
-Tunnel forwards to Caddy on localhost:8080.
+For **api.kloudykare.com**: The root Kloudy Caddyfile routes `/api/*` to 7501. Ensure Caddy is running with that config and reload after changes. Set `NEXT_PUBLIC_API_BASE=https://api.kloudykare.com` in GitHub Secrets.
 
 ## LiveKit
 
@@ -76,11 +92,23 @@ Tunnel forwards to Caddy on localhost:8080.
 
 ## Startup Order
 
-1. Ollama (background)
-2. AI Gateway: `cd ai-gateway && npm start` (port 7501)
-3. Caddy: `caddy run --config caddy/Caddyfile.local` (port 7502)
-4. Cloudflare: `cloudflared tunnel run ufc-api`
+1. **Ollama** (background) — port 11434
+2. **AI Gateway:** `cd ai-gateway && npm start` — port 7501
+3. **Caddy** (for api.kloudykare.com): `caddy run --config caddy/Caddyfile.tunnel` — port 8080
+4. **Cloudflare:** `cloudflared tunnel run ufc-api` or `cloudflared tunnel --url http://localhost:7501` (quick)
 
 ## Chat with Tools
 
 Use `?tools=1` for tool-calling (non-streaming): `POST /api/chat?tools=1`
+
+## Troubleshooting AI
+
+| Symptom | Check |
+|---------|-------|
+| "API base URL not configured" | `NEXT_PUBLIC_API_BASE` empty. Set in GitHub Secrets (deployed) or `.env.local` (local). |
+| "Failed to fetch" / CORS | API unreachable. Ensure AI Gateway (7501), tunnel, and `NEXT_PUBLIC_API_BASE` match. |
+| 401 Unauthorized | Sign in required. Chat needs valid Supabase session. |
+| Empty/slow response | Ollama not running or model not pulled. Run `ollama pull llama3.2:3b`. |
+| api.kloudykare.com returns wrong service | Tunnel may point to wrong port. Config: `service: http://localhost:7501` (direct) or `http://localhost:8080` (via Caddy). |
+
+**Verify locally:** `curl http://localhost:7501/api/health` → `{"status":"ok","service":"ufc-ai-gateway"}`
