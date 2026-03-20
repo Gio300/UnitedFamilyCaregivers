@@ -40,6 +40,14 @@ This adds missing columns and tables without dropping anything.
 
 This drops and recreates all tables. Use only if you have no data to keep.
 
+### Option C: Fix 406 / "No users found" (after schema)
+
+If profile fetches return 406 and @ mentions show "No users found", run:
+
+`supabase/migrations/003_profiles_rls_mention.sql`
+
+This adds RLS policies so managers, caregivers, and clients can see the profiles needed for @ mentions.
+
 ## After Running the Schema
 
 1. Restart the app or refresh the page
