@@ -64,11 +64,14 @@ export function RightSidebar() {
           <div className="space-y-2">
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Current mode: {mode.replace("_", " ")}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {mode === "messenger" && "DMs, calls, emails. Use @ for users, # for actions."}
+              {mode === "chat" && "General AI chat. Ask about company info, Nevada/Arizona programs, regulations."}
+              {mode === "notes" && "Call notes, activity log, and profile notes. Use Notes on what happened bar."}
+              {mode === "messenger" && "DMs, calls, emails. Use @ for users, # for actions (dm, email, reminder, appointment, call)."}
               {mode === "evv" && "EVV visit verification and time tracking."}
-              {mode === "customer_service" && "Client management, eligibility, documents, notes."}
+              {mode === "customer_service" && "Client management, eligibility, documents, notes. Eligibility button in chat bar."}
               {mode === "appointments" && "Schedule and manage appointments."}
-              {mode === "supervisor" && "Supervisor dashboard and oversight."}
+              {mode === "supervisor" && "Supervisor dashboard and oversight. Approve registrations, manage team."}
+              {mode === "eligibility" && "Nevada Medicaid eligibility. TOTP, open portal, check eligibility for clients."}
             </p>
           </div>
         )}

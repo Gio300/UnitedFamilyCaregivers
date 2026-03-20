@@ -170,6 +170,36 @@ app.post("/api/eligibility/open-portal", requireAuth, async (req, res) => {
   }
 });
 
+app.post("/api/eligibility/check", requireAuth, async (req, res) => {
+  try {
+    const { lastName, firstName, dob, effectiveFrom, recipientId, ssn } = req.body;
+    if (!lastName || !firstName || !dob) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: lastName, firstName, dob",
+      });
+    }
+    if (!recipientId && !ssn) {
+      return res.status(400).json({
+        success: false,
+        error: "Either recipientId or ssn is required",
+      });
+    }
+    const result = await eligibility.checkEligibility({
+      lastName,
+      firstName,
+      dob,
+      effectiveFrom,
+      recipientId,
+      ssn,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("Eligibility check error:", err);
+    res.status(500).json({ success: false, error: err.message, humanFallbackRequired: true });
+  }
+});
+
 app.post("/api/activity/auto-note", requireAuth, async (req, res) => {
   try {
     const { items, clientId, userId } = req.body;

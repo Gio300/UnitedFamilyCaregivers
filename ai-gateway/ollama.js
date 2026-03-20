@@ -11,10 +11,33 @@ You help with:
 
 Write in plain, everyday language. Be clear and direct. Avoid jargon. Stay professional but conversational.`;
 
+const MODE_PROMPTS = {
+  chat: "General chat mode.",
+  notes: "User is in Notes mode. Help with call notes, activity summaries, and documentation.",
+  messenger: "User is in Messenger mode. Help with DMs, calls, emails. Use @ for users, # for actions (dm, email, reminder, appointment, call).",
+  evv: "User is in EVV mode. Help with visit verification, time tracking, and EVV/billing.",
+  customer_service: "User is in Customer Service mode. Help with client management, eligibility, documents, onboarding, and notes.",
+  appointments: "User is in Appointments mode. Help schedule and manage appointments.",
+  supervisor: "User is in Supervisor mode. Help with approvals, oversight, and team management.",
+  eligibility: "User is in Eligibility mode. Help check Nevada Medicaid eligibility. For 'Check eligibility for @Name', you need lastName, firstName, dob, and either recipientId or ssn. The system can run automated eligibility checks.",
+};
+
+function buildSystemPrompt(userContext) {
+  let extra = "";
+  if (userContext?.mode && MODE_PROMPTS[userContext.mode]) {
+    extra += `\n\nCurrent mode: ${userContext.mode}. ${MODE_PROMPTS[userContext.mode]}`;
+  }
+  if (userContext?.activeClientId) {
+    extra += `\n\nActive client ID: ${userContext.activeClientId}`;
+  }
+  if (userContext && Object.keys(userContext).length > 0) {
+    extra += `\n\nUser context: ${JSON.stringify(userContext)}`;
+  }
+  return extra ? `${SYSTEM_PROMPT}${extra}` : SYSTEM_PROMPT;
+}
+
 async function generate(prompt, history = [], userContext = null) {
-  const systemPrompt = userContext
-    ? `${SYSTEM_PROMPT}\n\nUser context: ${JSON.stringify(userContext)}`
-    : SYSTEM_PROMPT;
+  const systemPrompt = buildSystemPrompt(userContext || {});
   const messages = [
     { role: "system", content: systemPrompt },
     ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -37,9 +60,7 @@ async function generate(prompt, history = [], userContext = null) {
 }
 
 async function generateStream(prompt, history = [], userContext = null, onToken) {
-  const systemPrompt = userContext
-    ? `${SYSTEM_PROMPT}\n\nUser context: ${JSON.stringify(userContext)}`
-    : SYSTEM_PROMPT;
+  const systemPrompt = buildSystemPrompt(userContext || {});
   const messages = [
     { role: "system", content: systemPrompt },
     ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -139,9 +160,8 @@ async function extractCallNoteFromText(text) {
 }
 
 async function generateWithTools(prompt, history, userContext, tools, executeToolFn, userId, maxIterations = 5) {
-  const systemPrompt = userContext
-    ? `${SYSTEM_PROMPT}\n\nUser context: ${JSON.stringify(userContext)}. You have access to tools - use them when appropriate.`
-    : `${SYSTEM_PROMPT}\n\nYou have access to tools - use them when appropriate.`;
+  const basePrompt = buildSystemPrompt(userContext || {});
+  const systemPrompt = `${basePrompt}\n\nYou have access to tools - use them when appropriate.`;
   let messages = [
     { role: "system", content: systemPrompt },
     ...history.map((m) => ({ role: m.role, content: m.content })),

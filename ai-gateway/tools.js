@@ -65,6 +65,25 @@ const TOOL_DEFINITIONS = [
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "check_eligibility",
+      description: "Check Nevada Medicaid eligibility for a client. Requires lastName, firstName, dob, and either recipientId or ssn.",
+      parameters: {
+        type: "object",
+        properties: {
+          lastName: { type: "string", description: "Client last name" },
+          firstName: { type: "string", description: "Client first name" },
+          dob: { type: "string", description: "Date of birth (MM/DD/YYYY)" },
+          recipientId: { type: "string", description: "Medicaid recipient ID (optional if ssn provided)" },
+          ssn: { type: "string", description: "Social Security Number (optional if recipientId provided)" },
+          effectiveFrom: { type: "string", description: "Effective date for check (optional)" },
+        },
+        required: ["lastName", "firstName", "dob"],
+      },
+    },
+  },
 ];
 
 async function executeTool(name, args, supabase, userId) {
@@ -115,6 +134,29 @@ async function executeTool(name, args, supabase, userId) {
       const { data, error } = await supabase.from("client_profiles").select("*");
       if (error) return JSON.stringify({ error: error.message });
       return JSON.stringify(data || []);
+    }
+    case "check_eligibility": {
+      const { lastName, firstName, dob, recipientId, ssn, effectiveFrom } = args || {};
+      if (!lastName || !firstName || !dob) {
+        return JSON.stringify({ error: "lastName, firstName, and dob are required" });
+      }
+      if (!recipientId && !ssn) {
+        return JSON.stringify({ error: "Either recipientId or ssn is required" });
+      }
+      try {
+        const eligibility = require("./eligibility");
+        const result = await eligibility.checkEligibility({
+          lastName,
+          firstName,
+          dob,
+          effectiveFrom,
+          recipientId,
+          ssn,
+        });
+        return JSON.stringify(result);
+      } catch (e) {
+        return JSON.stringify({ success: false, error: e.message, humanFallbackRequired: true });
+      }
     }
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });

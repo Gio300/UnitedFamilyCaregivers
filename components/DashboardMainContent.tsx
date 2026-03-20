@@ -3,6 +3,8 @@
 import { useApp } from "@/context/AppContext";
 import { ChatPanel } from "@/components/ChatPanel";
 import { CustomerServiceSidePanel } from "@/components/CustomerServiceSidePanel";
+import { EligibilitySidePanel } from "@/components/EligibilitySidePanel";
+import { SupervisorSidePanel } from "@/components/SupervisorSidePanel";
 import { ChatHistorySidebar } from "@/components/ChatHistorySidebar";
 import { RightSidebar } from "@/components/RightSidebar";
 
@@ -17,6 +19,8 @@ export function DashboardMainContent() {
           <ChatPanel />
         </div>
         <CustomerServiceSidePanel />
+        <EligibilitySidePanel />
+        <SupervisorSidePanel />
       </div>
       {rightSidebarOpen && <RightSidebar />}
     </>

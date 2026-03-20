@@ -27,4 +27,19 @@ async function openPortal() {
   }
 }
 
-module.exports = { getTotpCode, openPortal };
+async function checkEligibility(params) {
+  try {
+    const path = require("path");
+    const agentPath = path.join(__dirname, "..", "..", "backend", "services", "nevada-medicaid-agent");
+    const agent = require(agentPath);
+    return agent.checkEligibility(params);
+  } catch (e) {
+    return {
+      success: false,
+      error: e.message || "Eligibility check failed.",
+      humanFallbackRequired: true,
+    };
+  }
+}
+
+module.exports = { getTotpCode, openPortal, checkEligibility };

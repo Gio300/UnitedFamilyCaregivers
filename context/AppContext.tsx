@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 
-export type AppMode = "chat" | "notes" | "messenger" | "evv" | "customer_service" | "appointments" | "supervisor";
+export type AppMode = "chat" | "notes" | "messenger" | "evv" | "customer_service" | "appointments" | "supervisor" | "eligibility";
 
 export type PIPType = "settings" | "eligibility" | "document" | "expand" | "activity" | "supervisor_approval" | null;
 

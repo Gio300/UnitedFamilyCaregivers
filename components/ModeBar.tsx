@@ -12,6 +12,7 @@ const MODES: { id: AppMode; label: string; icon: string }[] = [
   { id: "customer_service", label: "Customer Service", icon: "CS" },
   { id: "appointments", label: "Appointments", icon: "A" },
   { id: "supervisor", label: "Supervisor", icon: "S" },
+  { id: "eligibility", label: "Eligibility", icon: "EL" },
 ];
 
 const ACCENT_CLASSES: Record<string, { active: string; inactive: string }> = {
@@ -34,9 +35,9 @@ export function ModeBar() {
         const approved = !!data?.approved_at;
         let base: AppMode[] = ["chat", "notes", "messenger", "evv"];
         if (role === "csr_admin" && approved) {
-          base = ["chat", "notes", "messenger", "evv", "customer_service", "appointments"];
+          base = ["chat", "notes", "messenger", "evv", "customer_service", "appointments", "eligibility"];
         } else if (role === "management_admin" && approved) {
-          base = ["chat", "notes", "messenger", "evv", "customer_service", "appointments", "supervisor"];
+          base = ["chat", "notes", "messenger", "evv", "customer_service", "appointments", "supervisor", "eligibility"];
         }
         setVisibleModes(base);
       });
