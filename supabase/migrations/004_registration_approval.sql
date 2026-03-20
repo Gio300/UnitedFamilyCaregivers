@@ -19,6 +19,10 @@ CREATE INDEX IF NOT EXISTS idx_registration_requests_user ON public.registration
 
 ALTER TABLE public.registration_requests ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "registration_requests_supervisor" ON public.registration_requests;
+DROP POLICY IF EXISTS "registration_requests_own" ON public.registration_requests;
+DROP POLICY IF EXISTS "profiles_update_supervisor" ON public.profiles;
+
 -- Supervisors (management_admin) can see and manage all requests
 CREATE POLICY "registration_requests_supervisor" ON public.registration_requests FOR ALL USING (
   EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'management_admin' AND p.approved_at IS NOT NULL)

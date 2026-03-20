@@ -49,7 +49,7 @@ Or run the migration file: `supabase/migrations/001_add_onboarding_notes_reminde
 
 ```bash
 cd ai-gateway
-# Ensure .env has PORT=9905
+# Ensure .env has PORT=7501
 npm start
 ```
 
@@ -77,8 +77,8 @@ Tunnel forwards to Caddy on localhost:8080.
 ## Startup Order
 
 1. Ollama (background)
-2. AI Gateway: `cd ai-gateway && npm start` (PORT=9905)
-3. Caddy: `caddy run --config caddy/Caddyfile.local` (port 8080)
+2. AI Gateway: `cd ai-gateway && npm start` (port 7501)
+3. Caddy: `caddy run --config caddy/Caddyfile.local` (port 7502)
 4. Cloudflare: `cloudflared tunnel run ufc-api`
 
 ## Chat with Tools

@@ -16,7 +16,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         router.replace("/login");
         return;
       }
-      supabase
+      void supabase
         .from("profiles")
         .select("role, approved_at")
         .eq("id", session.user.id)
@@ -32,7 +32,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           }
           setReady(true);
         })
-        .catch(() => setReady(true));
+        .then(undefined, () => setReady(true));
     });
   }, [router, pathname]);
 

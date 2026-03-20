@@ -1,11 +1,11 @@
 # UnitedFamilyCaregivers - Local development
 # Use: caddy run --config caddy/Caddyfile.local
-# Access: http://localhost:8080
-# Caddy proxies /api/* to AI Gateway on port 9900
+# Access: http://localhost:7502
+# Caddy proxies /api/* to AI Gateway on port 7501
 
-:8080 {
+:7502 {
 	handle /api/* {
-		reverse_proxy localhost:9905 {
+		reverse_proxy localhost:7501 {
 			stream_timeout 5m
 		}
 	}

@@ -89,27 +89,31 @@ export function ChatPanel() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
-      supabase.from("profiles").select("id, full_name").neq("id", user.id).then(({ data: profiles }) => {
-        supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: me }) => {
-          const role = me?.role;
-          if (role === "csr_admin" || role === "management_admin") {
-            supabase.from("profiles").select("id, full_name").then(({ data }) => setMentionUsers((data || []).map((p) => ({ ...p, email: "" }))));
-          } else if (role === "caregiver") {
-            supabase.from("client_profiles").select("user_id").eq("caregiver_id", user.id).then(({ data: clients }) => {
-              const ids = [...new Set((clients || []).map((c) => c.user_id).filter(Boolean))];
-              if (ids.length) {
-                supabase.from("profiles").select("id, full_name").in("id", ids).then(({ data }) => setMentionUsers((data || []).map((p) => ({ ...p, email: "" }))));
-              }
-            });
-          } else {
-            supabase.from("client_profiles").select("caregiver_id").eq("user_id", user.id).then(({ data: clients }) => {
-              const ids = [...new Set((clients || []).map((c) => c.caregiver_id).filter(Boolean))];
-              if (ids.length) {
-                supabase.from("profiles").select("id, full_name").in("id", ids).then(({ data }) => setMentionUsers((data || []).map((p) => ({ ...p, email: "" }))));
-              }
-            });
-          }
-        });
+      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: me }) => {
+        const role = me?.role;
+        if (role === "csr_admin" || role === "management_admin") {
+          supabase.from("profiles").select("id, full_name").then(({ data }) => {
+            setMentionUsers((data || []).map((p) => ({ ...p, email: "" })));
+          });
+        } else if (role === "caregiver") {
+          supabase.from("client_profiles").select("user_id").eq("caregiver_id", user.id).then(({ data: clients }) => {
+            const ids = [...new Set((clients || []).map((c) => c.user_id).filter(Boolean))];
+            if (ids.length) {
+              supabase.from("profiles").select("id, full_name").in("id", ids).then(({ data }) => {
+                setMentionUsers((data || []).map((p) => ({ ...p, email: "" })));
+              });
+            }
+          });
+        } else {
+          supabase.from("client_profiles").select("caregiver_id").eq("user_id", user.id).then(({ data: clients }) => {
+            const ids = [...new Set((clients || []).map((c) => c.caregiver_id).filter(Boolean))];
+            if (ids.length) {
+              supabase.from("profiles").select("id, full_name").in("id", ids).then(({ data }) => {
+                setMentionUsers((data || []).map((p) => ({ ...p, email: "" })));
+              });
+            }
+          });
+        }
       });
     });
   }, [supabase]);

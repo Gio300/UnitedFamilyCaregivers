@@ -5,7 +5,7 @@ const { createClient } = require("@supabase/supabase-js");
 const ollama = require("./ollama");
 const { TOOL_DEFINITIONS, executeTool } = require("./tools");
 
-const PORT = process.env.PORT || 9905;
+const PORT = process.env.PORT || 7501;
 const HOST = process.env.HOST || "0.0.0.0";
 
 const supabaseUrl = process.env.SUPABASE_URL;

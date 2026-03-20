@@ -22,7 +22,7 @@ export function SupervisorApprovalPIP({ onClose }: { onClose: () => void }) {
       .in("role", ["csr_admin", "management_admin"])
       .is("approved_at", null)
       .then(({ data }) => setUsers(data || []))
-      .finally(() => setLoading(false));
+      .then(() => setLoading(false), () => setLoading(false));
   }, [supabase]);
 
   const handleApprove = async (userId: string) => {
