@@ -170,6 +170,51 @@ app.post("/api/eligibility/open-portal", requireAuth, async (req, res) => {
   }
 });
 
+app.post("/api/activity/auto-note", requireAuth, async (req, res) => {
+  try {
+    const { items, clientId, userId } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "items array required" });
+    }
+
+    const summary = await ollama.generateActivitySummary(items);
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: req.headers.authorization
+          ? { Authorization: req.headers.authorization }
+          : {},
+      },
+    });
+
+    const { data: noteRow, error: noteErr } = await supabase
+      .from("call_notes")
+      .insert({
+        user_id: req.user.id,
+        client_id: clientId || null,
+        call_reason: "Profile activity auto-note",
+        disposition: "Completed",
+        notes: summary,
+      })
+      .select("id")
+      .single();
+
+    if (noteErr) {
+      return res.status(500).json({ error: noteErr.message });
+    }
+
+    const ids = items.map((i) => i.id);
+    await supabase
+      .from("activity_log")
+      .update({ noted_at: new Date().toISOString() })
+      .in("id", ids);
+
+    res.json({ noted: ids, callNoteId: noteRow?.id });
+  } catch (err) {
+    console.error("Auto-note error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/notes/extract", requireAuth, async (req, res) => {
   try {
     const { text } = req.body;

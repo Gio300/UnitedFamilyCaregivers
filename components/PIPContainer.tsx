@@ -20,6 +20,7 @@ export function PIPContainer({ settingsOpen, onCloseSettings }: PIPContainerProp
       {pipType === "eligibility" && <EligibilityPIP onClose={closePIP} />}
       {pipType === "document" && <DocumentPIP onClose={closePIP} />}
       {pipType === "expand" && expandContent && <ExpandPIP onClose={closePIP} title={expandContent.title} content={expandContent.content} />}
+      {pipType === "activity" && expandContent && <ExpandPIP onClose={closePIP} title={expandContent.title} content={expandContent.content} />}
     </>
   );
 }

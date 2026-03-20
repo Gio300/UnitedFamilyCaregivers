@@ -12,18 +12,61 @@ interface Message {
 }
 
 export function ChatPanel() {
-  const { mode, openPIP } = useApp();
+  const { mode, openPIP, chatResetKey, accentColor, addChatSession, loadChatSession, currentSessionId } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
+  const messagesRef = useRef<Message[]>([]);
+  messagesRef.current = messages;
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "40px";
+    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+  }, [input]);
+
+  useEffect(() => {
+    const msgs = messagesRef.current;
+    if (msgs.length > 0) {
+      addChatSession({
+        id: `session_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        messages: [...msgs],
+        preview: msgs[0]?.content?.slice(0, 60) || "New chat",
+        createdAt: Date.now(),
+      });
+    }
+    setMessages([]);
+  }, [chatResetKey, addChatSession]);
+
+  useEffect(() => {
+    if (!currentSessionId) return;
+    const session = loadChatSession(currentSessionId);
+    if (session) setMessages(session.messages);
+  }, [currentSessionId, loadChatSession]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const check = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      setShowScrollToBottom(scrollHeight - scrollTop - clientHeight > 80);
+    };
+    el.addEventListener("scroll", check);
+    check();
+    return () => el.removeEventListener("scroll", check);
   }, [messages]);
 
   async function sendMessage() {
@@ -103,8 +146,8 @@ export function ChatPanel() {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 border border-slate-200 rounded-xl bg-white shadow-sm">
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+    <div className="flex flex-col flex-1 min-h-0 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 shadow-sm">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 relative">
         {messages.length === 0 && (
           <p className="text-sm text-zinc-500">Send a message to start chatting.</p>
         )}
@@ -115,8 +158,11 @@ export function ChatPanel() {
           >
             <div className={`inline-block max-w-[85%] px-3 py-2 rounded-lg ${
               m.role === "user"
-                ? "bg-emerald-600 text-white"
-                : "bg-slate-100 text-slate-900"
+                ? accentColor === "blue" ? "bg-blue-600 text-white" :
+                  accentColor === "violet" ? "bg-violet-600 text-white" :
+                  accentColor === "amber" ? "bg-amber-600 text-white" :
+                  "bg-emerald-600 text-white"
+                : "bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
             }`}>
               {m.content !== "(attachment)" && <p className="whitespace-pre-wrap">{m.content}</p>}
               {m.attachments?.length ? (
@@ -161,6 +207,18 @@ export function ChatPanel() {
           <span className="inline-block w-2 h-4 bg-zinc-400 animate-pulse" />
         )}
         <div ref={bottomRef} />
+        {showScrollToBottom && (
+          <button
+            type="button"
+            onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+            className="absolute bottom-6 right-6 p-2 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 shadow-lg hover:bg-slate-300 dark:hover:bg-slate-500"
+            aria-label="Scroll to bottom"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 5v14M19 12l-7 7-7-7" />
+            </svg>
+          </button>
+        )}
       </div>
       <div className="p-3 border-t border-slate-200 space-y-2">
         {attachments.length > 0 && (
@@ -235,18 +293,29 @@ export function ChatPanel() {
             </svg>
           </button>
         )}
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
           placeholder="Type a message..."
-          className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+          rows={1}
+          className="flex-1 min-h-[40px] max-h-[200px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm resize-y overflow-y-auto"
         />
         <button
           onClick={sendMessage}
           disabled={loading}
-          className="rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-medium disabled:opacity-50 hover:bg-emerald-700"
+          className={`rounded-lg text-white px-4 py-2 text-sm font-medium disabled:opacity-50 ${
+            accentColor === "blue" ? "bg-blue-600 hover:bg-blue-700" :
+            accentColor === "violet" ? "bg-violet-600 hover:bg-violet-700" :
+            accentColor === "amber" ? "bg-amber-600 hover:bg-amber-700" :
+            "bg-emerald-600 hover:bg-emerald-700"
+          }`}
         >
           Send
         </button>

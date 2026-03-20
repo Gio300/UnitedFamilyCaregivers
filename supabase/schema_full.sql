@@ -20,6 +20,7 @@ DROP TABLE IF EXISTS public.user_documents CASCADE;
 DROP TABLE IF EXISTS public.leads CASCADE;
 DROP TABLE IF EXISTS public.chat_messages CASCADE;
 DROP TABLE IF EXISTS public.call_notes CASCADE;
+DROP TABLE IF EXISTS public.activity_log CASCADE;
 DROP TABLE IF EXISTS public.document_notes CASCADE;
 DROP TABLE IF EXISTS public.documents CASCADE;
 DROP TABLE IF EXISTS public.client_profiles CASCADE;
@@ -37,6 +38,8 @@ CREATE TABLE public.profiles (
   onboarding_completed boolean DEFAULT false,
   device_type text DEFAULT 'desktop',
   text_size text DEFAULT 'medium',
+  theme text DEFAULT 'light' CHECK (theme IN ('light','dark')),
+  accent_color text DEFAULT 'emerald',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -65,6 +68,19 @@ CREATE TABLE public.client_profiles (
   source text DEFAULT 'manual',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
+);
+
+-- =============================================================================
+-- ACTIVITY_LOG (profile actions for images 3/4 list, auto-note)
+-- =============================================================================
+CREATE TABLE public.activity_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users NOT NULL,
+  client_id uuid REFERENCES public.client_profiles(id),
+  action_type text NOT NULL,
+  details jsonb,
+  noted_at timestamptz,
+  created_at timestamptz DEFAULT now()
 );
 
 -- =============================================================================
@@ -238,6 +254,8 @@ CREATE INDEX idx_client_profiles_full_name ON public.client_profiles(full_name);
 CREATE INDEX idx_client_profiles_state ON public.client_profiles(state);
 CREATE INDEX idx_documents_client ON public.documents(client_id);
 CREATE INDEX idx_document_notes_document ON public.document_notes(document_id);
+CREATE INDEX idx_activity_log_user ON public.activity_log(user_id);
+CREATE INDEX idx_activity_log_client ON public.activity_log(client_id);
 CREATE INDEX idx_chat_messages_client ON public.chat_messages(client_id);
 CREATE INDEX idx_chat_messages_user ON public.chat_messages(user_id);
 CREATE INDEX idx_sent_messages_client ON public.sent_messages(client_id);
@@ -250,6 +268,7 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.call_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
@@ -291,6 +310,10 @@ CREATE POLICY "documents_update" ON public.documents FOR UPDATE USING (
 );
 CREATE POLICY "documents_delete" ON public.documents FOR DELETE USING (
   EXISTS (SELECT 1 FROM public.client_profiles cp WHERE cp.id = client_id AND (cp.caregiver_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('csr_admin','management_admin'))))
+);
+
+CREATE POLICY "activity_log_all" ON public.activity_log FOR ALL USING (
+  auth.uid() = user_id OR EXISTS (SELECT 1 FROM public.client_profiles cp WHERE cp.id = client_id AND (cp.user_id = auth.uid() OR cp.caregiver_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('csr_admin','management_admin'))))
 );
 
 CREATE POLICY "document_notes_all" ON public.document_notes FOR ALL USING (

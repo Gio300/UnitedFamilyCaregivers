@@ -6,10 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import { AuthGuard } from "@/components/AuthGuard";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { AppProvider } from "@/context/AppContext";
-import { DashboardHeader } from "@/components/DashboardHeader";
+import { Toolbar } from "@/components/Toolbar";
 import { ModeBar } from "@/components/ModeBar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { CustomerServiceSidePanel } from "@/components/CustomerServiceSidePanel";
+import { ChatHistorySidebar } from "@/components/ChatHistorySidebar";
+import { RightSidebar } from "@/components/RightSidebar";
+import { DashboardMainContent } from "@/components/DashboardMainContent";
 import { PIPContainer } from "@/components/PIPContainer";
 
 export default function DashboardLayout({
@@ -66,8 +69,8 @@ export default function DashboardLayout({
   return (
     <AuthGuard>
       <AppProvider>
-        <div className="min-h-screen flex flex-col bg-slate-50">
-          <DashboardHeader onSettingsClick={() => setSettingsOpen(true)} />
+        <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+          <Toolbar onSettingsClick={() => setSettingsOpen(true)} />
           <main className="flex-1 flex min-h-0 pb-16">
             {isProfilePage ? (
               <div className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 overflow-auto">
@@ -75,12 +78,7 @@ export default function DashboardLayout({
               </div>
             ) : (
               <>
-                <div className="flex-1 flex min-h-0 min-w-0">
-                  <div className="flex-1 flex flex-col min-w-0 p-4" data-onboarding-chat>
-                    <ChatPanel />
-                  </div>
-                  <CustomerServiceSidePanel />
-                </div>
+                <DashboardMainContent />
               </>
             )}
           </main>

@@ -31,6 +31,12 @@ export function ProfileForm() {
         full_name: fullName,
         updated_at: new Date().toISOString(),
       });
+      await supabase.from("activity_log").insert({
+        user_id: user.id,
+        client_id: null,
+        action_type: "profile_updated",
+        details: { full_name: fullName },
+      });
       setSaved(true);
     } finally {
       setLoading(false);

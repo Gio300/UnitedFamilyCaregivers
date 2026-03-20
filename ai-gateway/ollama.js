@@ -190,4 +190,15 @@ async function generateWithTools(prompt, history, userContext, tools, executeToo
   return "(Max tool iterations reached)";
 }
 
-module.exports = { generate, generateStream, generateWithTools, extractCallNoteFromText, MODEL_FAST, MODEL_SMART };
+const AUTO_NOTE_PROMPT = `Summarize these profile activities into a brief call note (2-4 sentences). Describe what was performed and why, in natural language suitable for a call log. Be concise.`;
+
+async function generateActivitySummary(activities) {
+  const text = activities
+    .map((a) => `- ${a.action_type}${a.details ? `: ${JSON.stringify(a.details)}` : ""}`)
+    .join("\n");
+  const fullPrompt = `${AUTO_NOTE_PROMPT}\n\nActivities:\n${text}`;
+  const response = await generateWithModel(MODEL_SMART, fullPrompt, []);
+  return response.trim();
+}
+
+module.exports = { generate, generateStream, generateWithTools, extractCallNoteFromText, generateActivitySummary, MODEL_FAST, MODEL_SMART };

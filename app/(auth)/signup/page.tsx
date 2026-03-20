@@ -20,10 +20,11 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
     try {
+      const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName } },
+        options: { data: { full_name: fullName }, emailRedirectTo: redirectTo },
       });
       if (error) throw error;
       if (data.user) {
