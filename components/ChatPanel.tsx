@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client";
 import { getApiBase } from "@/lib/api";
 import { useApp } from "@/context/AppContext";
 import { AutoNotesBar } from "@/components/AutoNotesBar";
-import { ModeBar } from "@/components/ModeBar";
 
 interface Message {
   role: "user" | "assistant";
@@ -89,7 +88,7 @@ export function ChatPanel() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
-      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: me }) => {
+      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: me, error: meErr }) => {
         const role = me?.role;
         if (role === "csr_admin" || role === "management_admin") {
           supabase.from("profiles").select("id, full_name").then(({ data }) => {
@@ -291,9 +290,6 @@ export function ChatPanel() {
       </div>
       <AutoNotesBar clientId={activeClientId} userId={currentUserId} />
       <div className="p-3 border-t border-slate-200 dark:border-zinc-700 space-y-2">
-        <div className="flex items-center gap-3 mb-2">
-          <ModeBar />
-        </div>
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {attachments.map((a, i) => (

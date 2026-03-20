@@ -22,7 +22,7 @@ const ACCENT_CLASSES: Record<string, { active: string; inactive: string }> = {
   amber: { active: "bg-amber-500/90 text-white", inactive: "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" },
 };
 
-export function ModeBar() {
+export function ModeBar({ vertical }: { vertical?: boolean }) {
   const { mode, setMode, accentColor } = useApp();
   const [visibleModes, setVisibleModes] = useState<AppMode[]>(["chat", "notes", "messenger", "evv"]);
   const supabase = createClient();
@@ -47,7 +47,7 @@ export function ModeBar() {
   const acc = ACCENT_CLASSES[accentColor] || ACCENT_CLASSES.emerald;
 
   return (
-    <div className="flex items-center gap-1">
+    <div className={`flex gap-1 ${vertical ? "flex-col" : "items-center"}`}>
       {MODES.filter((m) => visibleModes.includes(m.id)).map((m) => (
         <button
           key={m.id}
