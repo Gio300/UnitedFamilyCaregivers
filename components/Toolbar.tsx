@@ -11,21 +11,35 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ onSettingsClick }: ToolbarProps) {
-  const { theme, setTheme, accentColor, setLeftSidebarOpen, setRightSidebarOpen, leftSidebarOpen, rightSidebarOpen, resetChat } = useApp();
+  const { theme, setTheme, accentColor, setLeftSidebarOpen, setRightSidebarOpen, leftSidebarOpen, rightSidebarOpen, resetChat, openPIP } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userName, setUserName] = useState<string>("User");
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isSupervisor, setIsSupervisor] = useState(false);
   const supabase = createClient();
   const router = useRouter();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        supabase.from("profiles").select("full_name").eq("id", user.id).single().then(({ data }) => {
+        supabase.from("profiles").select("full_name, role, approved_at").eq("id", user.id).single().then(({ data }) => {
           setUserName(data?.full_name || user.email?.split("@")[0] || "User");
+          const approved = !!data?.approved_at;
+          setIsSupervisor(data?.role === "management_admin" && approved);
         });
       }
     });
   }, [supabase]);
+
+  useEffect(() => {
+    if (!isSupervisor) return;
+    supabase
+      .from("profiles")
+      .select("id")
+      .in("role", ["csr_admin", "management_admin"])
+      .is("approved_at", null)
+      .then(({ data }) => setPendingCount(data?.length ?? 0));
+  }, [isSupervisor, supabase]);
 
   async function handleLogout() {
     resetChat();
@@ -84,6 +98,24 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
 
       {/* Right: Right sidebar toggle only, Settings, User */}
       <div className="flex items-center gap-1">
+        {isSupervisor && pendingCount > 0 && (
+          <button
+            type="button"
+            onClick={() => openPIP("supervisor_approval")}
+            className="relative p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
+            title="Pending approvals"
+            aria-label="Pending approvals"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+              {pendingCount}
+            </span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setRightSidebarOpen(!rightSidebarOpen)}

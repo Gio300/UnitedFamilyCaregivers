@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getApiBase } from "@/lib/api";
 import { useApp } from "@/context/AppContext";
+import { AutoNotesBar } from "@/components/AutoNotesBar";
+import { ModeBar } from "@/components/ModeBar";
 
 interface Message {
   role: "user" | "assistant";
@@ -12,7 +14,7 @@ interface Message {
 }
 
 export function ChatPanel() {
-  const { mode, openPIP, chatResetKey, accentColor, addChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments } = useApp();
+  const { mode, openPIP, chatResetKey, accentColor, addChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments, activeClientId } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
@@ -31,8 +33,13 @@ export function ChatPanel() {
   const [showHashPicker, setShowHashPicker] = useState(false);
   const [hashQuery, setHashQuery] = useState("");
   const [hashIndex, setHashIndex] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id ?? null));
+  }, [supabase]);
 
   const HASH_ACTIONS = [
     { id: "dm", label: "DM", icon: "💬" },
@@ -270,7 +277,11 @@ export function ChatPanel() {
           </button>
         )}
       </div>
+      <AutoNotesBar clientId={activeClientId} userId={currentUserId} />
       <div className="p-3 border-t border-slate-200 dark:border-zinc-700 space-y-2">
+        <div className="flex items-center gap-3 mb-2">
+          <ModeBar />
+        </div>
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {attachments.map((a, i) => (

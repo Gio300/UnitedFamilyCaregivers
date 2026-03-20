@@ -7,7 +7,6 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { AppProvider } from "@/context/AppContext";
 import { Toolbar } from "@/components/Toolbar";
-import { ModeBar } from "@/components/ModeBar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { CustomerServiceSidePanel } from "@/components/CustomerServiceSidePanel";
 import { ChatHistorySidebar } from "@/components/ChatHistorySidebar";
@@ -65,15 +64,20 @@ export default function DashboardLayout({
   }
 
   const isProfilePage = pathname === "/dashboard/profile";
+  const isPendingApprovalPage = pathname === "/dashboard/pending-approval";
 
   return (
     <AuthGuard>
       <AppProvider>
         <div className="min-h-screen flex flex-col bg-white dark:bg-black">
           <Toolbar onSettingsClick={() => setSettingsOpen(true)} />
-          <main className="flex-1 flex min-h-0 overflow-hidden pb-16">
+          <main className="flex-1 flex min-h-0 overflow-hidden">
             {isProfilePage ? (
               <div className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 overflow-auto">
+                {children}
+              </div>
+            ) : isPendingApprovalPage ? (
+              <div className="flex-1 overflow-auto">
                 {children}
               </div>
             ) : (
@@ -82,7 +86,6 @@ export default function DashboardLayout({
               </>
             )}
           </main>
-          {!isProfilePage && <ModeBar />}
         </div>
         <PIPContainer settingsOpen={settingsOpen} onCloseSettings={() => setSettingsOpen(false)} />
         {showOnboarding && (

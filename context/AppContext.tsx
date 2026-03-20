@@ -2,9 +2,9 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 
-export type AppMode = "messenger" | "evv" | "customer_service" | "appointments" | "supervisor";
+export type AppMode = "chat" | "notes" | "messenger" | "evv" | "customer_service" | "appointments" | "supervisor";
 
-export type PIPType = "settings" | "eligibility" | "document" | "expand" | "activity" | null;
+export type PIPType = "settings" | "eligibility" | "document" | "expand" | "activity" | "supervisor_approval" | null;
 
 export type Theme = "light" | "dark";
 
@@ -58,7 +58,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<AppMode>("messenger");
+  const [mode, setMode] = useState<AppMode>("chat");
   const [pipType, setPipType] = useState<PIPType>(null);
   const [expandContent, setExpandContent] = useState<ExpandPIPContent | null>(null);
   const [theme, setThemeState] = useState<Theme>("light");
