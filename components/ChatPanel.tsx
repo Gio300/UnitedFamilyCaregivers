@@ -6,7 +6,6 @@ import { getApiBase } from "@/lib/api";
 import { useApp } from "@/context/AppContext";
 import { AutoNotesBar } from "@/components/AutoNotesBar";
 import { ModeBar } from "@/components/ModeBar";
-import { NotesOnWhatHappenedBar } from "@/components/NotesOnWhatHappenedBar";
 
 interface Message {
   role: "user" | "assistant";
@@ -283,7 +282,6 @@ export function ChatPanel() {
         )}
       </div>
       <AutoNotesBar clientId={activeClientId} userId={currentUserId} />
-      <NotesOnWhatHappenedBar clientId={activeClientId} userId={currentUserId} />
       <div className="p-3 border-t border-slate-200 dark:border-zinc-700 space-y-2">
         <div className="flex items-center gap-3 mb-2">
           <ModeBar />

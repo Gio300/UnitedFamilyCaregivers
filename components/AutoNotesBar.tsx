@@ -88,7 +88,7 @@ export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
     }
   };
 
-  if (items.length === 0) return null;
+  if (!targetId) return null;
 
   return (
     <div className="border-b border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900/50">
@@ -97,7 +97,9 @@ export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-800/50"
       >
-        <span className="font-medium">Auto notes ({items.length})</span>
+        <span className="font-medium">
+          Notes on what happened{items.length > 0 ? ` (${items.length})` : " — no actions yet"}
+        </span>
         <svg
           width="12"
           height="12"
@@ -113,7 +115,9 @@ export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
       {expanded && (
         <div className="px-3 pb-3 space-y-2">
           <div className="max-h-32 overflow-y-auto space-y-1 text-xs">
-            {items.slice(0, 8).map((a) => (
+            {items.length === 0 ? (
+              <p className="py-2 text-slate-500 dark:text-slate-400">Actions taken on this profile will appear here.</p>
+            ) : items.slice(0, 8).map((a) => (
               <div key={a.id} className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-zinc-800 last:border-0">
                 <span className="truncate">{a.action_type}</span>
                 {a.noted_at ? (
@@ -124,6 +128,7 @@ export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
               </div>
             ))}
           </div>
+          {items.length > 0 && (
           <div className="flex gap-2">
             <button
               type="button"
@@ -138,9 +143,10 @@ export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
               disabled={loading}
               className="px-2 py-1 rounded text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              Auto Note
+              Add notes
             </button>
           </div>
+          )}
         </div>
       )}
     </div>
