@@ -1,0 +1,12 @@
+# UFC Cloudflare Tunnel - keeps api.unitedfamilycaregivers.com running
+# Requires: Docker Desktop, AI Gateway on port 7501
+# Usage: docker compose -f docker-compose.cloudflared.yml up -d
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ufc-cloudflared
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.docker.yml run
+    volumes:
+      - "C:/Users/Flying Phoenix PCs/.cloudflared:/etc/cloudflared:ro"
