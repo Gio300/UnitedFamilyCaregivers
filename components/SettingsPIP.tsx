@@ -10,47 +10,49 @@ interface SettingsPIPProps {
 }
 
 export function SettingsPIP({ onClose }: SettingsPIPProps) {
-  const { theme, setTheme, accentColor, setAccentColor } = useApp();
-  const [deviceType, setDeviceType] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const [textSize, setTextSize] = useState<"small" | "medium" | "large">("medium");
+  const { theme, setTheme, accentColor, setAccentColor, deviceType, setDeviceType, textSize, setTextSize, resetSettings } = useApp();
   const supabase = createClient();
-
-  useEffect(() => {
-    const stored = localStorage.getItem("ufci_settings");
-    if (stored) {
-      try {
-        const { deviceType: d, textSize: t } = JSON.parse(stored);
-        if (d) setDeviceType(d);
-        if (t) setTextSize(t);
-      } catch {}
-    }
-  }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        supabase.from("profiles").select("device_type, text_size").eq("id", user.id).single().then(({ data }) => {
+        supabase.from("profiles").select("device_type, text_size, theme, accent_color").eq("id", user.id).single().then(({ data }) => {
           if (data?.device_type) setDeviceType(data.device_type as "desktop" | "tablet" | "mobile");
           if (data?.text_size) setTextSize(data.text_size as "small" | "medium" | "large");
-        });
+          if (data?.theme) setTheme((data.theme as Theme) || "light");
+          if (data?.accent_color) setAccentColor((data.accent_color as AccentColor) || "emerald");
+        }).catch(() => {});
       }
     });
   }, [supabase]);
 
-  const applySettings = () => {
+  const handleApply = () => {
     localStorage.setItem("ufci_settings", JSON.stringify({ deviceType, textSize }));
-    document.documentElement.setAttribute("data-device", deviceType);
-    document.documentElement.setAttribute("data-text-size", textSize);
-    document.documentElement.style.fontSize = textSize === "small" ? "14px" : textSize === "large" ? "18px" : "16px";
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        supabase.from("profiles").update({ device_type: deviceType, text_size: textSize }).eq("id", user.id);
+        supabase.from("profiles").update({
+          device_type: deviceType,
+          text_size: textSize,
+          theme: theme,
+          accent_color: accentColor,
+        }).eq("id", user.id).then(() => {});
       }
     });
+    onClose();
   };
 
-  const handleApply = () => {
-    applySettings();
+  const handleReset = () => {
+    resetSettings();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase.from("profiles").update({
+          device_type: "desktop",
+          text_size: "medium",
+          theme: "light",
+          accent_color: "emerald",
+        }).eq("id", user.id).then(() => {}).catch(() => {});
+      }
+    });
     onClose();
   };
 
@@ -62,7 +64,7 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
   ];
 
   return (
-    <PIPWindow title="Settings" onClose={onClose} defaultWidth={360} defaultHeight={420}>
+    <PIPWindow title="Settings" onClose={onClose} defaultWidth={360} defaultHeight={480}>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Theme</label>
@@ -139,13 +141,18 @@ export function SettingsPIP({ onClose }: SettingsPIPProps) {
             ))}
           </div>
         </div>
-        <div className="flex justify-end gap-2 pt-4">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm">
-            Cancel
+        <div className="flex justify-between gap-2 pt-4">
+          <button type="button" onClick={handleReset} className="px-4 py-2 rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 text-sm hover:bg-red-50 dark:hover:bg-red-900/20">
+            Reset to default
           </button>
-          <button type="button" onClick={handleApply} className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">
-            Save
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm">
+              Cancel
+            </button>
+            <button type="button" onClick={handleApply} className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">
+              Save
+            </button>
+          </div>
         </div>
       </div>
     </PIPWindow>

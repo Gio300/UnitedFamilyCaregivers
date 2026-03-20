@@ -12,7 +12,7 @@ interface Message {
 }
 
 export function ChatPanel() {
-  const { mode, openPIP, chatResetKey, accentColor, addChatSession, loadChatSession, currentSessionId } = useApp();
+  const { mode, openPIP, chatResetKey, accentColor, addChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
@@ -21,11 +21,26 @@ export function ChatPanel() {
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [mentionUsers, setMentionUsers] = useState<{ id: string; full_name: string; email: string }[]>([]);
+  const [showAtPicker, setShowAtPicker] = useState(false);
+  const [atQuery, setAtQuery] = useState("");
+  const [atIndex, setAtIndex] = useState(0);
+  const [showHashPicker, setShowHashPicker] = useState(false);
+  const [hashQuery, setHashQuery] = useState("");
+  const [hashIndex, setHashIndex] = useState(0);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+
+  const HASH_ACTIONS = [
+    { id: "dm", label: "DM", icon: "💬" },
+    { id: "email", label: "Email", icon: "✉️" },
+    { id: "reminder", label: "Set reminder", icon: "⏰" },
+    { id: "appointment", label: "Schedule appointment", icon: "📅" },
+    { id: "call", label: "Call", icon: "📞" },
+  ];
 
   useEffect(() => {
     const ta = textareaRef.current;
@@ -54,8 +69,43 @@ export function ChatPanel() {
   }, [currentSessionId, loadChatSession]);
 
   useEffect(() => {
+    if (pendingAttachments.length > 0) {
+      setAttachments((a) => [...a, ...pendingAttachments]);
+      setPendingAttachments([]);
+    }
+  }, [pendingAttachments, setPendingAttachments]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase.from("profiles").select("id, full_name").neq("id", user.id).then(({ data: profiles }) => {
+        supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: me }) => {
+          const role = me?.role;
+          if (role === "csr_admin" || role === "management_admin") {
+            supabase.from("profiles").select("id, full_name").then(({ data }) => setMentionUsers((data || []).map((p) => ({ ...p, email: "" }))));
+          } else if (role === "caregiver") {
+            supabase.from("client_profiles").select("user_id").eq("caregiver_id", user.id).then(({ data: clients }) => {
+              const ids = [...new Set((clients || []).map((c) => c.user_id).filter(Boolean))];
+              if (ids.length) {
+                supabase.from("profiles").select("id, full_name").in("id", ids).then(({ data }) => setMentionUsers((data || []).map((p) => ({ ...p, email: "" }))));
+              }
+            });
+          } else {
+            supabase.from("client_profiles").select("caregiver_id").eq("user_id", user.id).then(({ data: clients }) => {
+              const ids = [...new Set((clients || []).map((c) => c.caregiver_id).filter(Boolean))];
+              if (ids.length) {
+                supabase.from("profiles").select("id, full_name").in("id", ids).then(({ data }) => setMentionUsers((data || []).map((p) => ({ ...p, email: "" }))));
+              }
+            });
+          }
+        });
+      });
+    });
+  }, [supabase]);
 
   useEffect(() => {
     const el = scrollContainerRef.current;
@@ -235,50 +285,16 @@ export function ChatPanel() {
         <button
           type="button"
           onClick={() => openPIP("document")}
-          className="p-2 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-slate-100"
-          title="Upload document"
+          className="p-2 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700"
+          title="Documents & attachments"
           aria-label="Documents"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10 9 9 9 8 9"/>
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="p-2 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-slate-100"
-          title="Attach file"
-          aria-label="Attach"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
           </svg>
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          multiple
-          onChange={async (e) => {
-            const files = e.target.files;
-            if (!files?.length) return;
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-            for (const f of Array.from(files)) {
-              const path = `chat/${user.id}/${Date.now()}_${f.name}`;
-              const { data, error } = await supabase.storage.from("documents").upload(path, f);
-              if (!error && data?.path) {
-                const { data: urlData } = supabase.storage.from("documents").getPublicUrl(data.path);
-                setAttachments((a) => [...a, { name: f.name, url: urlData.publicUrl }]);
-              }
-            }
-            e.target.value = "";
-          }}
-        />
         {mode === "customer_service" && (
           <button
             type="button"
@@ -293,20 +309,76 @@ export function ChatPanel() {
             </svg>
           </button>
         )}
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              sendMessage();
-            }
-          }}
-          placeholder="Type a message..."
-          rows={1}
-          className="flex-1 min-h-[40px] max-h-[200px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm resize-y overflow-y-auto"
-        />
+        <div ref={inputContainerRef} className="flex-1 relative">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => {
+              const v = e.target.value;
+              const pos = e.target.selectionStart || v.length;
+              const before = v.slice(0, pos);
+              const atMatch = before.match(/@(\w*)$/);
+              const hashMatch = before.match(/#(\w*)$/);
+              if (atMatch) {
+                setShowAtPicker(true);
+                setShowHashPicker(false);
+                setAtQuery(atMatch[1].toLowerCase());
+                setAtIndex(0);
+              } else if (hashMatch) {
+                setShowHashPicker(true);
+                setShowAtPicker(false);
+                setHashQuery(hashMatch[1].toLowerCase());
+                setHashIndex(0);
+              } else {
+                setShowAtPicker(false);
+                setShowHashPicker(false);
+              }
+              setInput(v);
+            }}
+            onKeyDown={(e) => {
+              if (showAtPicker && mentionUsers.length) {
+                const filtered = mentionUsers.filter((u) => (u.full_name || "").toLowerCase().includes(atQuery));
+                if (e.key === "ArrowDown") { e.preventDefault(); setAtIndex((i) => Math.min(i + 1, filtered.length - 1)); return; }
+                if (e.key === "ArrowUp") { e.preventDefault(); setAtIndex((i) => Math.max(i - 1, 0)); return; }
+                if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); const u = filtered[atIndex]; if (u) { const pos = textareaRef.current?.selectionStart ?? input.length; const before = input.slice(0, input.lastIndexOf("@")); setInput(before + `@${u.full_name} `); setShowAtPicker(false); } return; }
+                if (e.key === "Escape") { setShowAtPicker(false); return; }
+              }
+              if (showHashPicker) {
+                const filtered = HASH_ACTIONS.filter((a) => a.label.toLowerCase().includes(hashQuery) || a.id.includes(hashQuery));
+                if (e.key === "ArrowDown") { e.preventDefault(); setHashIndex((i) => Math.min(i + 1, filtered.length - 1)); return; }
+                if (e.key === "ArrowUp") { e.preventDefault(); setHashIndex((i) => Math.max(i - 1, 0)); return; }
+                if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); const a = filtered[hashIndex]; if (a) { const before = input.slice(0, input.lastIndexOf("#")); setInput(before + `#${a.label} `); setShowHashPicker(false); } return; }
+                if (e.key === "Escape") { setShowHashPicker(false); return; }
+              }
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
+            placeholder="Type a message... Use @ for users, # for actions (dm, email, reminder, appointment, call)"
+            rows={1}
+            className="w-full min-h-[40px] max-h-[200px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm resize-y overflow-y-auto"
+          />
+          {showAtPicker && (
+            <div className="absolute bottom-full left-0 mb-1 w-56 max-h-40 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-xl py-1 z-50">
+              {mentionUsers.filter((u) => (u.full_name || "").toLowerCase().includes(atQuery)).slice(0, 8).map((u, i) => (
+                <button key={u.id} type="button" onClick={() => { const before = input.slice(0, input.lastIndexOf("@")); setInput(before + `@${u.full_name} `); setShowAtPicker(false); textareaRef.current?.focus(); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 ${i === atIndex ? "bg-slate-100 dark:bg-slate-700" : ""}`}>
+                  {u.full_name || "Unknown"}
+                </button>
+              ))}
+              {mentionUsers.filter((u) => (u.full_name || "").toLowerCase().includes(atQuery)).length === 0 && <div className="px-3 py-2 text-sm text-slate-500">No users found</div>}
+            </div>
+          )}
+          {showHashPicker && (
+            <div className="absolute bottom-full left-0 mb-1 w-56 max-h-40 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-xl py-1 z-50">
+              {HASH_ACTIONS.filter((a) => a.label.toLowerCase().includes(hashQuery) || a.id.includes(hashQuery)).map((a, i) => (
+                <button key={a.id} type="button" onClick={() => { const before = input.slice(0, input.lastIndexOf("#")); setInput(before + `#${a.label} `); setShowHashPicker(false); textareaRef.current?.focus(); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 ${i === hashIndex ? "bg-slate-100 dark:bg-slate-700" : ""}`}>
+                  <span>{a.icon}</span> {a.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button
           onClick={sendMessage}
           disabled={loading}

@@ -43,7 +43,7 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
   const accent = accentMap[accentColor] || accentMap.emerald;
 
   return (
-    <header className="h-10 flex items-center justify-between px-2 border-b border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 shrink-0">
+    <header className="h-10 flex items-center justify-between px-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-black text-slate-600 dark:text-white shrink-0">
       {/* Left: Chat icon, Nav, Project name */}
       <div className="flex items-center gap-1">
         <button
@@ -82,20 +82,8 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
         <span className={`ml-2 text-sm font-semibold ${accent}`}>UFCi</span>
       </div>
 
-      {/* Right: Sidebar toggles, Settings, User */}
+      {/* Right: Right sidebar toggle only, Settings, User */}
       <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-          className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
-          title={leftSidebarOpen ? "Hide left panel" : "Show left panel"}
-          aria-label="Toggle left panel"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="2" y="4" width="10" height="16" rx="1" />
-            <rect x="14" y="4" width="8" height="16" rx="1" opacity="0.5" />
-          </svg>
-        </button>
         <button
           type="button"
           onClick={() => setRightSidebarOpen(!rightSidebarOpen)}

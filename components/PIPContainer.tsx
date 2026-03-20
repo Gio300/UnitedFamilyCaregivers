@@ -3,7 +3,7 @@
 import { useApp } from "@/context/AppContext";
 import { SettingsPIP } from "./SettingsPIP";
 import { EligibilityPIP } from "./EligibilityPIP";
-import { DocumentPIP } from "./DocumentPIP";
+import { DocumentsPIP } from "./DocumentsPIP";
 import { ExpandPIP } from "./ExpandPIP";
 
 interface PIPContainerProps {
@@ -18,7 +18,7 @@ export function PIPContainer({ settingsOpen, onCloseSettings }: PIPContainerProp
     <>
       {settingsOpen && <SettingsPIP onClose={onCloseSettings} />}
       {pipType === "eligibility" && <EligibilityPIP onClose={closePIP} />}
-      {pipType === "document" && <DocumentPIP onClose={closePIP} />}
+      {pipType === "document" && <DocumentsPIP onClose={closePIP} />}
       {pipType === "expand" && expandContent && <ExpandPIP onClose={closePIP} title={expandContent.title} content={expandContent.content} />}
       {pipType === "activity" && expandContent && <ExpandPIP onClose={closePIP} title={expandContent.title} content={expandContent.content} />}
     </>

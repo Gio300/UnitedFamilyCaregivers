@@ -34,12 +34,11 @@ export function ModeBar() {
         const role = data?.role || "client";
         const approved = !!data?.approved_at;
         const isManagerEmail = email === "johnny.allen32@yahoo.com";
-        const base: AppMode[] = ["messenger", "evv"];
-        if (role === "csr_admin" || role === "management_admin") {
-          base.push("customer_service", "appointments");
-        }
-        if (role === "management_admin" && (approved || isManagerEmail)) {
-          base.push("supervisor");
+        let base: AppMode[] = ["messenger", "evv"];
+        if (role === "csr_admin") {
+          base = ["messenger", "evv", "customer_service", "appointments"];
+        } else if (role === "management_admin") {
+          base = ["messenger", "evv", "customer_service", "appointments", "supervisor"];
         }
         setVisibleModes(base);
       });

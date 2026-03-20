@@ -69,7 +69,7 @@ export default function DashboardLayout({
   return (
     <AuthGuard>
       <AppProvider>
-        <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+        <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-black">
           <Toolbar onSettingsClick={() => setSettingsOpen(true)} />
           <main className="flex-1 flex min-h-0 pb-16">
             {isProfilePage ? (

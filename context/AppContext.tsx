@@ -33,6 +33,11 @@ interface AppContextValue {
   setTheme: (t: Theme) => void;
   accentColor: AccentColor;
   setAccentColor: (c: AccentColor) => void;
+  deviceType: "desktop" | "tablet" | "mobile";
+  setDeviceType: (d: "desktop" | "tablet" | "mobile") => void;
+  textSize: "small" | "medium" | "large";
+  setTextSize: (t: "small" | "medium" | "large") => void;
+  resetSettings: () => void;
   activeClientId: string | null;
   setActiveClientId: (id: string | null) => void;
   resetChat: () => void;
@@ -46,6 +51,8 @@ interface AppContextValue {
   loadChatSession: (id: string) => ChatSession | null;
   openChatSession: (id: string) => void;
   currentSessionId: string | null;
+  pendingAttachments: { name: string; url: string }[];
+  setPendingAttachments: (files: { name: string; url: string }[]) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -56,6 +63,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [expandContent, setExpandContent] = useState<ExpandPIPContent | null>(null);
   const [theme, setThemeState] = useState<Theme>("light");
   const [accentColor, setAccentColorState] = useState<AccentColor>("emerald");
+  const [deviceType, setDeviceTypeState] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [textSize, setTextSizeState] = useState<"small" | "medium" | "large">("medium");
   const [activeClientId, setActiveClientIdState] = useState<string | null>(null);
   const [chatResetKey, setChatResetKey] = useState(0);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
@@ -64,6 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const chatSessionsRef = useRef<ChatSession[]>([]);
   chatSessionsRef.current = chatSessions;
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string }[]>([]);
 
   const openChatSession = useCallback((id: string) => {
     setCurrentSessionIdState(id);
@@ -105,6 +115,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("ufci_accent", c);
   }, []);
 
+  const setDeviceType = useCallback((d: "desktop" | "tablet" | "mobile") => {
+    setDeviceTypeState(d);
+    document.documentElement.setAttribute("data-device", d);
+    localStorage.setItem("ufci_device", d);
+  }, []);
+
+  const setTextSize = useCallback((t: "small" | "medium" | "large") => {
+    setTextSizeState(t);
+    document.documentElement.setAttribute("data-text-size", t);
+    document.documentElement.style.fontSize = t === "small" ? "14px" : t === "large" ? "18px" : "16px";
+    localStorage.setItem("ufci_text_size", t);
+  }, []);
+
+  const resetSettings = useCallback(() => {
+    setThemeState("light");
+    setAccentColorState("emerald");
+    setDeviceTypeState("desktop");
+    setTextSizeState("medium");
+    document.documentElement.classList.remove("dark");
+    document.documentElement.setAttribute("data-accent", "emerald");
+    document.documentElement.setAttribute("data-device", "desktop");
+    document.documentElement.setAttribute("data-text-size", "medium");
+    document.documentElement.style.fontSize = "16px";
+    localStorage.setItem("ufci_theme", "light");
+    localStorage.setItem("ufci_accent", "emerald");
+    localStorage.setItem("ufci_device", "desktop");
+    localStorage.setItem("ufci_text_size", "medium");
+    localStorage.setItem("ufci_settings", JSON.stringify({ deviceType: "desktop", textSize: "medium" }));
+  }, []);
+
   const resetChat = useCallback(() => {
     setCurrentSessionIdState(null);
     setChatResetKey((k) => k + 1);
@@ -113,9 +153,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const t = (localStorage.getItem("ufci_theme") as Theme) || "light";
     const c = (localStorage.getItem("ufci_accent") as AccentColor) || "emerald";
+    let d: "desktop" | "tablet" | "mobile" = "desktop";
+    const stored = localStorage.getItem("ufci_device") || localStorage.getItem("ufci_settings");
+    if (stored) {
+      try {
+        const parsed = stored.startsWith("{") ? JSON.parse(stored) : null;
+        d = parsed?.deviceType || (["tablet", "mobile"].includes(stored) ? stored : "desktop");
+      } catch {
+        d = stored === "tablet" || stored === "mobile" ? stored : "desktop";
+      }
+    }
+    const ts = (localStorage.getItem("ufci_text_size") || "medium") as "small" | "medium" | "large";
     setTheme(t);
     setAccentColor(c);
-  }, [setTheme, setAccentColor]);
+    setDeviceType(d);
+    setTextSize(ts);
+  }, [setTheme, setAccentColor, setDeviceType, setTextSize]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -151,6 +204,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setTheme,
         accentColor,
         setAccentColor,
+        deviceType,
+        setDeviceType,
+        textSize,
+        setTextSize,
+        resetSettings,
         activeClientId,
         setActiveClientId,
         resetChat,
@@ -164,6 +222,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         loadChatSession,
         openChatSession,
         currentSessionId,
+        pendingAttachments,
+        setPendingAttachments,
       }}
     >
       {children}

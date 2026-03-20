@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 
-type RightTab = "notes" | "messenger" | "tools";
+type RightTab = "notes" | "messenger" | "tools" | "mode";
 
 export function RightSidebar() {
   const { setRightSidebarOpen, mode } = useApp();
@@ -12,8 +12,8 @@ export function RightSidebar() {
   return (
     <aside className="w-72 shrink-0 border-l border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-800/50 flex flex-col">
       <div className="p-2 border-b border-slate-700/50 flex items-center justify-between">
-        <div className="flex gap-1">
-          {(["notes", "messenger", "tools"] as const).map((t) => (
+        <div className="flex gap-1 flex-wrap">
+          {(["notes", "messenger", "tools", "mode"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -58,6 +58,18 @@ export function RightSidebar() {
               <li>• Eligibility (Customer Service)</li>
               <li>• More coming soon</li>
             </ul>
+          </div>
+        )}
+        {tab === "mode" && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Current mode: {mode.replace("_", " ")}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {mode === "messenger" && "DMs, calls, emails. Use @ for users, # for actions."}
+              {mode === "evv" && "EVV visit verification and time tracking."}
+              {mode === "customer_service" && "Client management, eligibility, documents, notes."}
+              {mode === "appointments" && "Schedule and manage appointments."}
+              {mode === "supervisor" && "Supervisor dashboard and oversight."}
+            </p>
           </div>
         )}
       </div>
