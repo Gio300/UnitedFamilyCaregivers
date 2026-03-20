@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "United Family Caregivers",
+  title: "UFCi",
   description: "NV Care Solutions Inc. – Serving Nevada and Arizona",
 };
 

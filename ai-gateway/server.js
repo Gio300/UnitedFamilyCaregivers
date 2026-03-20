@@ -142,6 +142,34 @@ app.post("/api/livekit/token", requireAuth, async (req, res) => {
   }
 });
 
+const eligibility = require("./eligibility");
+
+app.get("/api/eligibility/totp", requireAuth, (req, res) => {
+  try {
+    const code = eligibility.getTotpCode();
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        error: "TOTP not configured. Set NEVADA_MEDICAID_TOTP_SECRET in .env and install otplib.",
+      });
+    }
+    res.json({ success: true, code });
+  } catch (err) {
+    console.error("TOTP error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/eligibility/open-portal", requireAuth, async (req, res) => {
+  try {
+    const result = await eligibility.openPortal();
+    res.json(result);
+  } catch (err) {
+    console.error("Open portal error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post("/api/notes/extract", requireAuth, async (req, res) => {
   try {
     const { text } = req.body;

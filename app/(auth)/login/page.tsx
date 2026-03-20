@@ -32,7 +32,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm space-y-6 p-6 rounded-xl bg-white shadow-lg border border-slate-200">
-        <h1 className="text-2xl font-bold text-center text-slate-800">United Family Caregivers</h1>
+        <h1 className="text-2xl font-bold text-center text-emerald-700">UFCi</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-1 text-slate-700">

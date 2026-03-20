@@ -1,19 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AuthGuard } from "@/components/AuthGuard";
 import { OnboardingTour } from "@/components/OnboardingTour";
-
-const nav = [
-  { href: "/dashboard", label: "Home" },
-  { href: "/dashboard/chat", label: "Chat" },
-  { href: "/dashboard/profile", label: "Profile" },
-  { href: "/dashboard/documents", label: "Documents" },
-  { href: "/dashboard/calls", label: "Calls" },
-];
+import { AppProvider } from "@/context/AppContext";
+import { DashboardHeader } from "@/components/DashboardHeader";
+import { ModeBar } from "@/components/ModeBar";
+import { ChatPanel } from "@/components/ChatPanel";
+import { CustomerServiceSidePanel } from "@/components/CustomerServiceSidePanel";
+import { PIPContainer } from "@/components/PIPContainer";
 
 export default function DashboardLayout({
   children,
@@ -25,6 +22,7 @@ export default function DashboardLayout({
   const supabase = createClient();
   const [ready, setReady] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -63,44 +61,47 @@ export default function DashboardLayout({
     );
   }
 
+  const isProfilePage = pathname === "/dashboard/profile";
+
   return (
     <AuthGuard>
-      <div className="min-h-screen flex flex-col bg-slate-50">
-        <header className="border-b border-slate-200 bg-white shadow-sm">
-          <nav className="flex gap-4 px-4 py-3 max-w-4xl mx-auto" data-onboarding-nav>
-            {nav.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`text-sm font-medium ${
-                  pathname === item.href
-                    ? "text-slate-900"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </header>
-        <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6">
-          {children}
-        </main>
-      </div>
-      {showOnboarding && (
-        <OnboardingTour
-          onComplete={async () => {
-            setShowOnboarding(false);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              await supabase.from("profiles").update({ onboarding_completed: true }).eq("id", user.id);
-            }
-            if (typeof window !== "undefined") {
-              localStorage.setItem("ufc_onboarding_done", "1");
-            }
-          }}
-        />
-      )}
+      <AppProvider>
+        <div className="min-h-screen flex flex-col bg-slate-50">
+          <DashboardHeader onSettingsClick={() => setSettingsOpen(true)} />
+          <main className="flex-1 flex min-h-0 pb-16">
+            {isProfilePage ? (
+              <div className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 overflow-auto">
+                {children}
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 flex min-h-0 min-w-0">
+                  <div className="flex-1 flex flex-col min-w-0 p-4" data-onboarding-chat>
+                    <ChatPanel />
+                  </div>
+                  <CustomerServiceSidePanel />
+                </div>
+              </>
+            )}
+          </main>
+          {!isProfilePage && <ModeBar />}
+        </div>
+        <PIPContainer settingsOpen={settingsOpen} onCloseSettings={() => setSettingsOpen(false)} />
+        {showOnboarding && (
+          <OnboardingTour
+            onComplete={async () => {
+              setShowOnboarding(false);
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                await supabase.from("profiles").update({ onboarding_completed: true }).eq("id", user.id);
+              }
+              if (typeof window !== "undefined") {
+                localStorage.setItem("ufc_onboarding_done", "1");
+              }
+            }}
+          />
+        )}
+      </AppProvider>
     </AuthGuard>
   );
 }

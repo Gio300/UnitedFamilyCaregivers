@@ -100,7 +100,12 @@ async function executeTool(name, args, supabase, userId) {
       const { title, due_at } = args || {};
       const { data, error } = await supabase
         .from("reminders")
-        .insert({ user_id: userId, title: title || "Reminder", due_at: due_at || null })
+        .insert({
+          creator_id: userId,
+          target_user_id: userId,
+          text: title || "Reminder",
+          remind_at: due_at || new Date().toISOString(),
+        })
         .select()
         .single();
       if (error) return JSON.stringify({ error: error.message });
