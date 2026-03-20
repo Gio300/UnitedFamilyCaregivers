@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS public.test_client_profiles (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_test_client_profiles_client ON public.test_client_profiles(client_id);
-CREATE INDEX idx_test_client_profiles_caregiver ON public.test_client_profiles(caregiver_id);
+CREATE INDEX IF NOT EXISTS idx_test_client_profiles_client ON public.test_client_profiles(client_id);
+CREATE INDEX IF NOT EXISTS idx_test_client_profiles_caregiver ON public.test_client_profiles(caregiver_id);
 
 ALTER TABLE public.test_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.test_client_profiles ENABLE ROW LEVEL SECURITY;

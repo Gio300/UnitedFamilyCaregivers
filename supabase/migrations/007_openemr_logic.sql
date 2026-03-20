@@ -18,9 +18,9 @@ CREATE TABLE IF NOT EXISTS public.encounters (
   updated_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_encounters_client ON public.encounters(client_id);
-CREATE INDEX idx_encounters_caregiver ON public.encounters(caregiver_id);
-CREATE INDEX idx_encounters_date ON public.encounters(encounter_date);
+CREATE INDEX IF NOT EXISTS idx_encounters_client ON public.encounters(client_id);
+CREATE INDEX IF NOT EXISTS idx_encounters_caregiver ON public.encounters(caregiver_id);
+CREATE INDEX IF NOT EXISTS idx_encounters_date ON public.encounters(encounter_date);
 
 ALTER TABLE public.encounters ENABLE ROW LEVEL SECURITY;
 
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS public.clinical_notes (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_clinical_notes_encounter ON public.clinical_notes(encounter_id);
+CREATE INDEX IF NOT EXISTS idx_clinical_notes_encounter ON public.clinical_notes(encounter_id);
 
 ALTER TABLE public.clinical_notes ENABLE ROW LEVEL SECURITY;
 
@@ -76,9 +76,9 @@ CREATE TABLE IF NOT EXISTS public.appointments (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_appointments_client ON public.appointments(client_id);
-CREATE INDEX idx_appointments_caregiver ON public.appointments(caregiver_id);
-CREATE INDEX idx_appointments_start ON public.appointments(start_at);
+CREATE INDEX IF NOT EXISTS idx_appointments_client ON public.appointments(client_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_caregiver ON public.appointments(caregiver_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_start ON public.appointments(start_at);
 
 ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
 
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS public.client_allergies (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_client_allergies_client ON public.client_allergies(client_id);
+CREATE INDEX IF NOT EXISTS idx_client_allergies_client ON public.client_allergies(client_id);
 
 ALTER TABLE public.client_allergies ENABLE ROW LEVEL SECURITY;
 
@@ -152,8 +152,8 @@ CREATE TABLE IF NOT EXISTS public.client_vitals (
   notes text
 );
 
-CREATE INDEX idx_client_vitals_client ON public.client_vitals(client_id);
-CREATE INDEX idx_client_vitals_recorded ON public.client_vitals(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_client_vitals_client ON public.client_vitals(client_id);
+CREATE INDEX IF NOT EXISTS idx_client_vitals_recorded ON public.client_vitals(recorded_at);
 
 ALTER TABLE public.client_vitals ENABLE ROW LEVEL SECURITY;
 

@@ -189,8 +189,8 @@ CREATE TABLE public.incoming_emails (
   client_id uuid REFERENCES public.client_profiles(id)
 );
 
-CREATE INDEX idx_incoming_emails_message_id ON public.incoming_emails(message_id);
-CREATE INDEX idx_incoming_emails_received ON public.incoming_emails(received_at);
+CREATE INDEX IF NOT EXISTS idx_incoming_emails_message_id ON public.incoming_emails(message_id);
+CREATE INDEX IF NOT EXISTS idx_incoming_emails_received ON public.incoming_emails(received_at);
 
 -- =============================================================================
 -- REMINDERS (full Kloudy-style)
@@ -210,8 +210,8 @@ CREATE TABLE public.reminders (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_reminders_target ON public.reminders(target_user_id);
-CREATE INDEX idx_reminders_remind_at ON public.reminders(remind_at);
+CREATE INDEX IF NOT EXISTS idx_reminders_target ON public.reminders(target_user_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON public.reminders(remind_at);
 
 -- =============================================================================
 -- NOTIFICATION_VIEWS (seen/marked items)
@@ -248,18 +248,18 @@ CREATE TABLE public.auto_mode_settings (
 -- =============================================================================
 -- INDEXES
 -- =============================================================================
-CREATE INDEX idx_call_notes_client ON public.call_notes(client_id);
-CREATE INDEX idx_call_notes_user ON public.call_notes(user_id);
-CREATE INDEX idx_client_profiles_full_name ON public.client_profiles(full_name);
-CREATE INDEX idx_client_profiles_state ON public.client_profiles(state);
-CREATE INDEX idx_documents_client ON public.documents(client_id);
-CREATE INDEX idx_document_notes_document ON public.document_notes(document_id);
-CREATE INDEX idx_activity_log_user ON public.activity_log(user_id);
-CREATE INDEX idx_activity_log_client ON public.activity_log(client_id);
-CREATE INDEX idx_chat_messages_client ON public.chat_messages(client_id);
-CREATE INDEX idx_chat_messages_user ON public.chat_messages(user_id);
-CREATE INDEX idx_sent_messages_client ON public.sent_messages(client_id);
-CREATE INDEX idx_user_documents_user ON public.user_documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_call_notes_client ON public.call_notes(client_id);
+CREATE INDEX IF NOT EXISTS idx_call_notes_user ON public.call_notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_client_profiles_full_name ON public.client_profiles(full_name);
+CREATE INDEX IF NOT EXISTS idx_client_profiles_state ON public.client_profiles(state);
+CREATE INDEX IF NOT EXISTS idx_documents_client ON public.documents(client_id);
+CREATE INDEX IF NOT EXISTS idx_document_notes_document ON public.document_notes(document_id);
+CREATE INDEX IF NOT EXISTS idx_activity_log_user ON public.activity_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_log_client ON public.activity_log(client_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_client ON public.chat_messages(client_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user ON public.chat_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_sent_messages_client ON public.sent_messages(client_id);
+CREATE INDEX IF NOT EXISTS idx_user_documents_user ON public.user_documents(user_id);
 
 -- =============================================================================
 -- ROW LEVEL SECURITY
