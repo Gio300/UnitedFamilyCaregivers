@@ -32,3 +32,11 @@ VALUES
   ('d4444444-4444-4444-4444-444444444401', 'Manager User', 'management_admin', now()),
   ('e5555555-5555-5555-5555-555555555501', 'Dana CSR Approved', 'csr_admin', now())
 ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role, approved_at = EXCLUDED.approved_at;
+
+-- Sample call notes for CSR work list (run after seed_test_minimal has client_profiles)
+INSERT INTO public.call_notes (user_id, client_id, call_reason, disposition, notes)
+SELECT 'e5555555-5555-5555-5555-555555555501'::uuid, cp.id, 'Eligibility inquiry', 'Completed', 'Verified client eligibility for Nevada Medicaid.'
+FROM public.client_profiles cp WHERE cp.user_id = 'b2222222-2222-2222-2222-222222222201'::uuid LIMIT 1;
+INSERT INTO public.call_notes (user_id, client_id, call_reason, disposition, notes)
+SELECT 'e5555555-5555-5555-5555-555555555501'::uuid, cp.id, 'Document upload', 'Completed', 'Client uploaded ID verification.'
+FROM public.client_profiles cp WHERE cp.user_id = 'b2222222-2222-2222-2222-222222222201'::uuid LIMIT 1;

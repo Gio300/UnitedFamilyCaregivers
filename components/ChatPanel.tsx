@@ -153,7 +153,7 @@ export function ChatPanel() {
       }
 
       const history = messages.map(({ role, content }) => ({ role, content }));
-      const useTools = mode === "eligibility" || mode === "customer_service";
+      const useTools = mode === "eligibility" || mode === "customer_service" || mode === "appointments";
       const res = await fetch(`${apiBase}/api/chat?stream=1${useTools ? "&tools=1" : ""}`, {
         method: "POST",
         headers: {

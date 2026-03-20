@@ -13,7 +13,24 @@ const supabaseAnonKey =
   process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
 const app = express();
-app.use(cors({ origin: true, credentials: true }));
+const allowedOrigins = [
+  "https://gio300.github.io",
+  "http://localhost:7500",
+  "http://127.0.0.1:7500",
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin) || /^https:\/\/[^.]+\.github\.io$/.test(origin)) {
+      cb(null, origin || true);
+    } else {
+      cb(null, true);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+}));
+app.options("*", (req, res) => res.sendStatus(204));
 app.use(express.json());
 
 async function requireAuth(req, res, next) {
@@ -91,7 +108,7 @@ app.post("/api/chat", requireAuth, async (req, res) => {
         global: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
       });
       const executeToolFn = async (name, args, userId) => {
-        return executeTool(name, args, supabaseWithAuth, userId);
+        return executeTool(name, args, supabaseWithAuth, userId, req.body.userContext);
       };
       const content = await ollama.generateWithTools(
         message,

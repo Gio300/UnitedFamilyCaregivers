@@ -3,16 +3,11 @@
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { ModeBar } from "@/components/ModeBar";
+import { ProfilesPanel } from "@/components/ProfilesPanel";
+import { AppointmentsSidePanel } from "@/components/AppointmentsSidePanel";
+import { ClientSidePanel } from "@/components/ClientSidePanel";
 
-type RightTab = "notes" | "messenger" | "tools" | "mode" | "test_users";
-
-const TEST_USERS = [
-  { email: "test_client@ufci-test.local", password: "test123", role: "Client", modes: "Chat, Notes, Messenger, EVV" },
-  { email: "test_caregiver@ufci-test.local", password: "test123", role: "Caregiver", modes: "Chat, Notes, Messenger, EVV" },
-  { email: "test_csr@ufci-test.local", password: "test123", role: "CSR (pending)", modes: "Basic until approved" },
-  { email: "test_csr_approved@ufci-test.local", password: "test123", role: "CSR", modes: "Customer Service, Eligibility, Appointments" },
-  { email: "test_manager@ufci-test.local", password: "test123", role: "Manager", modes: "Supervisor + all modes" },
-];
+type RightTab = "notes" | "messenger" | "tools" | "mode" | "profiles" | "appointments" | "client";
 
 export function RightSidebar() {
   const { setRightSidebarOpen, mode } = useApp();
@@ -22,7 +17,7 @@ export function RightSidebar() {
     <aside className="w-72 shrink-0 border-l border-slate-200 dark:border-zinc-700/50 bg-white dark:bg-zinc-900/95 flex flex-col">
       <div className="p-2 border-b border-slate-200 dark:border-zinc-700/50 flex items-center justify-between">
         <div className="flex gap-1 flex-wrap">
-          {(["notes", "messenger", "tools", "mode", "test_users"] as const).map((t) => (
+          {(["notes", "messenger", "tools", "mode", "profiles", "appointments", "client"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -31,7 +26,7 @@ export function RightSidebar() {
                 tab === t ? "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white" : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50"
               }`}
             >
-              {t === "test_users" ? "Test Users" : t}
+              {t}
             </button>
           ))}
         </div>
@@ -65,7 +60,9 @@ export function RightSidebar() {
             <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
               <li>• Documents</li>
               <li>• Eligibility (Customer Service)</li>
-              <li>• More coming soon</li>
+              <li>• Encounters, appointments</li>
+              <li>• Medications, allergies</li>
+              <li>• SOAP notes, vitals</li>
             </ul>
           </div>
         )}
@@ -85,21 +82,14 @@ export function RightSidebar() {
             </p>
           </div>
         )}
-        {tab === "test_users" && (
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Test login credentials</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Use these to test all modes and profiles. Run seed_test_extended.sql for full set.</p>
-            <div className="space-y-2">
-              {TEST_USERS.map((u) => (
-                <div key={u.email} className="p-2 rounded-lg bg-slate-100 dark:bg-zinc-800 text-xs">
-                  <p className="font-medium text-slate-800 dark:text-slate-200">{u.role}</p>
-                  <p className="text-slate-600 dark:text-slate-400">Email: {u.email}</p>
-                  <p className="text-slate-600 dark:text-slate-400">Password: {u.password}</p>
-                  <p className="text-slate-500 dark:text-slate-500 mt-1">Modes: {u.modes}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+        {tab === "profiles" && (
+          <ProfilesPanel />
+        )}
+        {tab === "appointments" && (
+          <AppointmentsSidePanel />
+        )}
+        {tab === "client" && (
+          <ClientSidePanel />
         )}
       </div>
     </aside>

@@ -4,21 +4,28 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ProfileForm } from "@/components/ProfileForm";
 import { ActivityList } from "@/components/ActivityList";
+import { ClientDetail } from "@/components/ClientDetail";
 import { useApp } from "@/context/AppContext";
 
 export default function ProfilePage() {
-  const { setActiveClientId, resetChat } = useApp();
+  const { activeClientId, setActiveClientId, resetChat } = useApp();
   const [userId, setUserId] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setUserId(user.id);
-        setActiveClientId(null);
-      }
+      if (user) setUserId(user.id);
     });
-  }, [supabase, setActiveClientId]);
+  }, [supabase]);
+
+  if (activeClientId) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-semibold">Client detail</h1>
+        <ClientDetail clientId={activeClientId} onBack={() => setActiveClientId(null)} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
