@@ -9,6 +9,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState<"client" | "caregiver" | "csr_admin" | "management_admin">("client");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function SignupPage() {
         await supabase.from("profiles").upsert({
           id: data.user.id,
           full_name: fullName,
+          role,
           updated_at: new Date().toISOString(),
         });
       }
@@ -70,6 +72,22 @@ export default function SignupPage() {
               required
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
             />
+          </div>
+          <div>
+            <label htmlFor="role" className="block text-sm font-medium mb-1 text-slate-700">
+              I am a
+            </label>
+            <select
+              id="role"
+              value={role}
+              onChange={(e) => setRole(e.target.value as typeof role)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
+            >
+              <option value="client">Client / Family</option>
+              <option value="caregiver">Caregiver</option>
+              <option value="csr_admin">CSR / Admin</option>
+              <option value="management_admin">Management Admin</option>
+            </select>
           </div>
           <div>
             <label htmlFor="password" className="block text-sm font-medium mb-1 text-slate-700">
