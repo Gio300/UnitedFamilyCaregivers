@@ -1,0 +1,21 @@
+# UFC API - VPS Docker deployment (mirrors KloudyKare api subdomain)
+# api.unitedfamilycaregivers.com -> AI Gateway (ai-gateway:7501)
+# Caddy obtains Let's Encrypt certs. Ensure DNS A record points to this server.
+
+{
+	admin off
+}
+
+api.unitedfamilycaregivers.com {
+	handle /api/* {
+		reverse_proxy ai-gateway:7501 {
+			stream_timeout 5m
+			flush_interval -1
+			request_buffers 32kb
+			response_buffers 32kb
+		}
+	}
+	handle {
+		respond "UnitedFamilyCaregivers API" 200
+	}
+}

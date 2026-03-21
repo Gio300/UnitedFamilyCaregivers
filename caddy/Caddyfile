@@ -9,8 +9,8 @@
 	admin off
 }
 
-# When traffic arrives via Cloudflare Tunnel (api.kloudykare.com or your domain)
-api.kloudykare.com {
+# When traffic arrives via Cloudflare Tunnel (api.kloudykare.com or api.unitedfamilycaregivers.com)
+api.kloudykare.com api.unitedfamilycaregivers.com {
 	handle /api/* {
 		reverse_proxy localhost:7501 {
 			stream_timeout 5m
