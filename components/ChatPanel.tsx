@@ -137,8 +137,7 @@ export function ChatPanel() {
     setAttachments([]);
     setLoading(true);
     setStreaming(true);
-    let fetchStart = 0;
-    let fetchUrl = "";
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -150,19 +149,18 @@ export function ChatPanel() {
 
       const apiBase = getApiBase();
       if (!apiBase) {
-        setMessages((m) => [...m, { role: "assistant", content: "API base URL not configured." }]);
+        setMessages((m) => [...m, { role: "assistant", content: "API base URL not configured. Set NEXT_PUBLIC_API_BASE in GitHub Secrets or .env.local." }]);
         return;
       }
 
       const history = messages.map(({ role, content }) => ({ role, content }));
       const useTools = userRole === "csr_admin" || userRole === "management_admin";
-      fetchUrl = `${apiBase}/api/chat?stream=1${useTools ? "&tools=1" : ""}`;
-      // #region agent log
-      fetchStart = Date.now();
-      fetch("http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "9b773e" }, body: JSON.stringify({ sessionId: "9b773e", location: "ChatPanel.tsx:fetch", message: "Chat fetch start", data: { apiBase, fetchUrl, fetchStart }, timestamp: Date.now(), hypothesisId: "H1,H2,H5" }) }).catch(() => {});
-      // #endregion
+      const fetchUrl = `${apiBase}/api/chat?stream=1${useTools ? "&tools=1" : ""}`;
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), 20000);
       const res = await fetch(fetchUrl, {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -175,6 +173,7 @@ export function ChatPanel() {
           userContext: { role: userRole || undefined, activeClientId: activeClientId || undefined },
         }),
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const err = await res.text();
@@ -210,14 +209,12 @@ export function ChatPanel() {
 
       setMessages((m) => [...m, { role: "assistant", content: content || "(No response)" }]);
     } catch (err) {
-      // #region agent log
-      const fetchEnd = Date.now();
-      fetch("http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "9b773e" }, body: JSON.stringify({ sessionId: "9b773e", location: "ChatPanel.tsx:catch", message: "Chat fetch failed", data: { errMsg: err instanceof Error ? err.message : String(err), errName: err instanceof Error ? err.name : "", durationMs: fetchStart ? fetchEnd - fetchStart : 0, fetchUrl }, timestamp: Date.now(), hypothesisId: "H2,H3,H4" }) }).catch(() => {});
-      // #endregion
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: `Error: ${err instanceof Error ? err.message : "Unknown error"}` },
-      ]);
+      if (timeoutId) clearTimeout(timeoutId);
+      const errMsg = err instanceof Error ? err.message : "Unknown error";
+      const displayMsg = errMsg.includes("aborted") || errMsg.includes("timeout")
+        ? "Request timed out. If using api.unitedfamilycaregivers.com, add the domain to Cloudflare (see CLOUDFLARE_IPV4_FIX.md). Or use a quick tunnel: scripts\\start-tunnel-and-get-url.ps1"
+        : `Error: ${errMsg}`;
+      setMessages((m) => [...m, { role: "assistant", content: displayMsg }]);
     } finally {
       setLoading(false);
       setStreaming(false);
