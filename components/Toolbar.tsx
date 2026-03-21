@@ -12,7 +12,7 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ onSettingsClick }: ToolbarProps) {
-  const { theme, setTheme, accentColor, setLeftSidebarOpen, leftSidebarOpen, resetChat, openPIP } = useApp();
+  const { theme, setTheme, accentColor, setLeftSidebarOpen, leftSidebarOpen, setRightSidebarOpen, resetChat, openPIP } = useApp();
   const { count: messageCenterCount } = useMessageCenterUnread();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userName, setUserName] = useState<string>("User");
@@ -27,7 +27,7 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
         supabase.from("profiles").select("full_name, role, approved_at").eq("id", user.id).single().then(({ data }) => {
           setUserName(data?.full_name || user.email?.split("@")[0] || "User");
           const approved = !!data?.approved_at;
-          setIsSupervisor(data?.role === "management_admin" && approved);
+          setIsSupervisor((data?.role === "management_admin" || data?.role === "csr_admin") && approved);
         });
       }
     });
@@ -37,10 +37,10 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
     if (!isSupervisor) return;
     supabase
       .from("profiles")
-      .select("id")
+      .select("id", { count: "exact", head: true })
       .in("role", ["csr_admin", "management_admin"])
       .is("approved_at", null)
-      .then(({ data }) => setPendingCount(data?.length ?? 0));
+      .then(({ count }) => setPendingCount(count ?? 0));
   }, [isSupervisor, supabase]);
 
   async function handleLogout() {
@@ -98,8 +98,21 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
         <span className={`ml-2 text-sm font-semibold ${accent}`}>UFCi</span>
       </div>
 
-      {/* Right: Right sidebar toggle only, Settings, User */}
+      {/* Right: Profiles panel, Settings, User */}
       <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setRightSidebarOpen(true)}
+          className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
+          title="Profiles"
+          aria-label="Profiles"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </button>
         {isSupervisor && pendingCount > 0 && (
           <button
             type="button"
@@ -163,6 +176,7 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
         <button
           type="button"
           onClick={onSettingsClick}
+          data-onboarding-settings
           className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
           title="Settings"
           aria-label="Settings"

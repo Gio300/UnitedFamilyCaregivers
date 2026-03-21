@@ -38,9 +38,8 @@ export default function AuthCallbackPage() {
               setMessage(setError.message);
               return;
             }
-            setStatus("success");
-            setMessage("Your password has been reset. Redirecting to sign in...");
-            setTimeout(() => router.replace("/login"), 2000);
+            router.replace("/reset-password");
+            return;
           } else if (accessToken && refreshToken && (type === "signup" || type === "magiclink" || type === "email")) {
             const { error: setError } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
             if (setError) {
@@ -49,8 +48,8 @@ export default function AuthCallbackPage() {
               return;
             }
             setStatus("success");
-            setMessage("Thank you for verifying your email. Redirecting to dashboard...");
-            setTimeout(() => router.replace("/dashboard"), 2000);
+            setMessage("Thank you for verifying your email. Redirecting to sign in...");
+            setTimeout(() => router.replace("/login"), 2000);
           } else {
             setStatus("error");
             setMessage("Could not complete verification. You may already be verified. Try signing in.");

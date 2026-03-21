@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/context/AppContext";
@@ -23,8 +24,17 @@ export function ProfilesPanel() {
   const { setActiveClientId } = useApp();
   const router = useRouter();
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
+  const [allProfiles, setAllProfiles] = useState<ProfileRow[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
+
+  useEffect(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) setProfiles(allProfiles);
+    else setProfiles(allProfiles.filter((p) => (p.full_name || "").toLowerCase().includes(q) || p.role.toLowerCase().includes(q)));
+  }, [search, allProfiles]);
 
   const viewClient = (clientProfileId: string) => {
     setActiveClientId(clientProfileId);
@@ -148,7 +158,7 @@ export function ProfilesPanel() {
         })
       );
 
-      setProfiles(enriched);
+      setAllProfiles(enriched);
       setLoading(false);
     }
     load();
@@ -174,6 +184,23 @@ export function ProfilesPanel() {
 
   return (
     <div className="space-y-3">
+      {isAdmin && (
+        <div className="space-y-2">
+          <input
+            type="search"
+            placeholder="Search by name or role…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm"
+          />
+          <Link
+            href="/signup"
+            className="block w-full py-2 rounded-lg bg-emerald-600 text-white text-center text-sm font-medium hover:bg-emerald-700"
+          >
+            Create profile
+          </Link>
+        </div>
+      )}
       <p className="text-sm text-slate-500 dark:text-slate-400">
         Clients, caregivers, and staff.
       </p>

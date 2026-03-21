@@ -6,14 +6,26 @@ import "driver.js/dist/driver.css";
 
 interface OnboardingTourProps {
   onComplete: () => void;
+  onOpenSettings?: () => void;
 }
 
-export function OnboardingTour({ onComplete }: OnboardingTourProps) {
+export function OnboardingTour({ onComplete, onOpenSettings }: OnboardingTourProps) {
   useEffect(() => {
     const driverObj = driver({
       showProgress: true,
       steps: [
-        { element: "body", popover: { title: "Welcome to UFCi", description: "This is your main workspace. Chat is front and center.", side: "bottom", align: "center" } },
+        {
+          element: "[data-onboarding-settings]",
+          popover: {
+            title: "Let's adjust your view",
+            description: "Click the Settings button above to open it. Adjust text size and page zoom with the sliders until everything feels comfortable. Changes apply instantly. Then click Next to continue.",
+            side: "bottom",
+            align: "center",
+          },
+          onHighlightStarted: () => {
+            onOpenSettings?.();
+          },
+        },
         { element: "[data-onboarding-chat]", popover: { title: "Chat", description: "Send messages here. Chat adapts to your role (client, caregiver, admin).", side: "right", align: "start" } },
         { element: "body", popover: { title: "All set!", description: "Use the bell icon for Message Center. Documents icon for uploads. Click your name for Profile.", side: "bottom", align: "center" } },
       ],
@@ -21,6 +33,6 @@ export function OnboardingTour({ onComplete }: OnboardingTourProps) {
     });
     driverObj.drive();
     return () => driverObj.destroy();
-  }, [onComplete]);
+  }, [onComplete, onOpenSettings]);
   return null;
 }

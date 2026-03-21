@@ -6,6 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/context/AppContext";
 
 const SECTIONS = ["Medicaid", "ID", "Care Plan", "Other"];
+const UPLOAD_LIMIT_BYTES = 50 * 1024 * 1024;
+
+function currentMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 
 type Tab = "upload" | "attach";
 
@@ -54,6 +60,16 @@ export function DocumentsPIP({ onClose }: DocumentsPIPProps) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
+
+      if (!isStaff) {
+        const month = currentMonth();
+        const { data: usage } = await supabase.from("user_upload_usage").select("bytes_used").eq("user_id", user.id).eq("month", month).single();
+        const used = usage?.bytes_used ?? 0;
+        if (used + file.size > UPLOAD_LIMIT_BYTES) {
+          throw new Error("50 MB monthly upload limit reached. Try again next month or contact support.");
+        }
+      }
+
       let targetClientId = clientId;
       if (!targetClientId) {
         const { data: cp } = await supabase.from("client_profiles").select("id").eq("user_id", user.id).limit(1).single();
@@ -72,6 +88,18 @@ export function DocumentsPIP({ onClose }: DocumentsPIPProps) {
         notes: notes || null,
       });
       if (insertError) throw insertError;
+
+      if (!isStaff) {
+        const month = currentMonth();
+        const { data: row } = await supabase.from("user_upload_usage").select("bytes_used").eq("user_id", user.id).eq("month", month).single();
+        const prevUsed = row?.bytes_used ?? 0;
+        const newTotal = prevUsed + file.size;
+        await supabase.from("user_upload_usage").upsert(
+          { user_id: user.id, month, bytes_used: newTotal, updated_at: new Date().toISOString() },
+          { onConflict: "user_id,month" }
+        );
+      }
+
       setFile(null);
       setNotes("");
       setSection("");
@@ -89,16 +117,43 @@ export function DocumentsPIP({ onClose }: DocumentsPIPProps) {
     if (!input?.files?.length) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    const staff = profile?.role === "csr_admin" || profile?.role === "management_admin";
+
+    const files = Array.from(input.files);
+    if (!staff) {
+      const month = currentMonth();
+      const { data: row } = await supabase.from("user_upload_usage").select("bytes_used").eq("user_id", user.id).eq("month", month).single();
+      const used = row?.bytes_used ?? 0;
+      const totalNew = files.reduce((s, f) => s + f.size, 0);
+      if (used + totalNew > UPLOAD_LIMIT_BYTES) {
+        alert("50 MB monthly upload limit reached. Try again next month or contact support.");
+        return;
+      }
+    }
+
     const attached: { name: string; url: string }[] = [];
-    for (const f of Array.from(input.files)) {
+    let totalUploaded = 0;
+    for (const f of files) {
       const path = `chat/${user.id}/${Date.now()}_${f.name}`;
       const { data, error } = await supabase.storage.from("documents").upload(path, f);
       if (!error && data?.path) {
         const { data: urlData } = supabase.storage.from("documents").getPublicUrl(data.path);
         attached.push({ name: f.name, url: urlData.publicUrl });
+        totalUploaded += f.size;
       }
     }
     if (attached.length) {
+      if (!staff && totalUploaded > 0) {
+        const month = currentMonth();
+        const { data: row } = await supabase.from("user_upload_usage").select("bytes_used").eq("user_id", user.id).eq("month", month).single();
+        const prevUsed = row?.bytes_used ?? 0;
+        await supabase.from("user_upload_usage").upsert(
+          { user_id: user.id, month, bytes_used: prevUsed + totalUploaded, updated_at: new Date().toISOString() },
+          { onConflict: "user_id,month" }
+        );
+      }
       setPendingAttachments(attached);
       input.value = "";
       onClose();

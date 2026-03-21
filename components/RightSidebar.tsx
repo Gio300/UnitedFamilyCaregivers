@@ -10,8 +10,10 @@ import { ClientSidePanel } from "@/components/ClientSidePanel";
 type RightTab = "notes" | "messenger" | "tools" | "mode" | "profiles" | "appointments" | "client";
 
 export function RightSidebar() {
-  const { setRightSidebarOpen, mode } = useApp();
-  const [tab, setTab] = useState<RightTab>("notes");
+  const { rightSidebarOpen, setRightSidebarOpen, mode } = useApp();
+  const [tab, setTab] = useState<RightTab>("profiles");
+
+  if (!rightSidebarOpen) return null;
 
   return (
     <aside className="w-72 shrink-0 border-l border-slate-200 dark:border-zinc-700/50 bg-white dark:bg-zinc-900/95 flex flex-col">

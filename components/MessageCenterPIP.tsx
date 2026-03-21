@@ -8,7 +8,8 @@ export type MessageCenterItem =
   | { type: "call_note"; id: string; data: { call_reason?: string; disposition?: string; notes?: string; created_at: string; client_id?: string } }
   | { type: "incoming_email"; id: string; data: { from_email: string; subject?: string; body?: string; received_at: string; client_id?: string } }
   | { type: "sent_message"; id: string; data: { recipient_email: string; subject?: string; body?: string; sent_at: string; client_id: string } }
-  | { type: "activity"; id: string; data: { action_type: string; details?: Record<string, unknown> | string; created_at: string; client_id?: string } };
+  | { type: "activity"; id: string; data: { action_type: string; details?: Record<string, unknown> | string; created_at: string; client_id?: string } }
+  | { type: "appointment"; id: string; data: { title: string; start_at: string; status: string; client_id?: string; caregiver_id?: string } };
 
 export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
   const [items, setItems] = useState<MessageCenterItem[]>([]);
@@ -22,7 +23,7 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
 
   const getDate = (item: MessageCenterItem): string => {
     const d = item.data as Record<string, unknown>;
-    return (d.remind_at || d.created_at || d.received_at || d.sent_at || "") as string;
+    return (d.remind_at || d.created_at || d.received_at || d.sent_at || d.start_at || "") as string;
   };
 
   const fetchItems = useCallback(async () => {
@@ -31,7 +32,10 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
 
     const uid = user.id;
 
-    const [remindersRes, callNotesRes, incomingRes, sentRes, activityRes, viewsRes] = await Promise.all([
+    const now = new Date();
+    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    const [remindersRes, callNotesRes, incomingRes, sentRes, activityRes, viewsRes, apptsRes] = await Promise.all([
       supabase
         .from("reminders")
         .select("id, text, remind_at, client_id")
@@ -65,6 +69,34 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
         .from("notification_views")
         .select("item_type, item_id")
         .eq("user_id", uid),
+      (async () => {
+        const { data: asCaregiver } = await supabase
+          .from("appointments")
+          .select("id, title, start_at, status, client_id, caregiver_id")
+          .eq("caregiver_id", uid)
+          .gte("start_at", now.toISOString())
+          .lte("start_at", in24h.toISOString())
+          .in("status", ["scheduled", "confirmed"])
+          .order("start_at", { ascending: true })
+          .limit(10);
+        const { data: myClientProfiles } = await supabase.from("client_profiles").select("id").eq("user_id", uid);
+        const myClientIds = myClientProfiles?.map((c) => c.id) || [];
+        let asClient: unknown[] = [];
+        if (myClientIds.length > 0) {
+          const { data } = await supabase
+            .from("appointments")
+            .select("id, title, start_at, status, client_id, caregiver_id")
+            .in("client_id", myClientIds)
+            .gte("start_at", now.toISOString())
+            .lte("start_at", in24h.toISOString())
+            .in("status", ["scheduled", "confirmed"])
+            .order("start_at", { ascending: true })
+            .limit(10);
+          asClient = data || [];
+        }
+        const merged = [...(asCaregiver || []), ...asClient].sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()).slice(0, 20);
+        return { data: merged };
+      })(),
     ]);
 
     const seen = new Set((viewsRes.data || []).map((v) => `${v.item_type}-${v.item_id}`));
@@ -86,6 +118,9 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
     });
     (activityRes.data || []).forEach((a) => {
       combined.push({ type: "activity", id: a.id, data: a });
+    });
+    ((apptsRes as { data?: unknown[] })?.data || []).forEach((a: { id: string; title: string; start_at: string; status: string; client_id?: string; caregiver_id?: string }) => {
+      combined.push({ type: "appointment", id: a.id, data: a });
     });
 
     combined.sort((a, b) => new Date(getDate(b)).getTime() - new Date(getDate(a)).getTime());
@@ -128,7 +163,7 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
   };
 
   const typeLabel = (t: string) =>
-    ({ reminder: "Reminder", call_note: "Call", incoming_email: "Email", sent_message: "Sent", activity: "Activity" }[t] || t);
+    ({ reminder: "Reminder", call_note: "Call", incoming_email: "Email", sent_message: "Sent", activity: "Activity", appointment: "Appointment" }[t] || t);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
@@ -230,6 +265,15 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
                   <p className="text-xs text-slate-500">{formatDate(selectedItem.data.created_at)}</p>
                 </>
               )}
+              {selectedItem.type === "appointment" && (
+                <>
+                  <p className="font-medium text-slate-900 dark:text-white">{selectedItem.data.title}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    {new Date(selectedItem.data.start_at).toLocaleString()} · {selectedItem.data.status}
+                  </p>
+                  <p className="text-xs text-slate-500">Scheduled appointment reminder</p>
+                </>
+              )}
             </div>
           ) : items.length === 0 ? (
             <p className="text-sm text-slate-500">No messages yet.</p>
@@ -245,6 +289,8 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
                 if (item.type === "sent_message") preview = `To ${item.data.recipient_email}: ${(item.data.subject || "").slice(0, 40)}`;
                 if (item.type === "activity")
                   preview = item.data.action_type || String(item.data.details || "").slice(0, 40) || "Activity";
+                if (item.type === "appointment")
+                  preview = item.data.title + " – " + new Date(item.data.start_at).toLocaleString();
 
                 const date = getDate(item);
 

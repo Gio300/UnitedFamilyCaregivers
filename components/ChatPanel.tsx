@@ -254,6 +254,9 @@ export function ChatPanel() {
             key={i}
             className={`text-sm ${m.role === "user" ? "text-right" : "text-left"}`}
           >
+            {m.role === "assistant" && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">Kloudy</p>
+            )}
             <div className={`inline-block max-w-[85%] px-3 py-2 rounded-lg ${
               m.role === "user"
                 ? accentColor === "blue" ? "bg-blue-600 text-white" :
@@ -404,7 +407,7 @@ export function ChatPanel() {
             }}
             placeholder={
               userRole === "csr_admin" || userRole === "management_admin"
-                ? "Client help, eligibility, documents. Use @ for users, # for actions."
+                ? "Chat with Kloudy. Client help, eligibility, documents. Use @ for users, # for actions."
                 : "Type a message... Use @ for users, # for actions (dm, email, reminder, appointment, call)"
             }
             rows={1}

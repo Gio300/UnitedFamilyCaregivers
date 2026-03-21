@@ -11,14 +11,23 @@ import { MessageCenterPIP } from "./MessageCenterPIP";
 interface PIPContainerProps {
   settingsOpen: boolean;
   onCloseSettings: () => void;
+  settingsPriority?: boolean;
 }
 
-export function PIPContainer({ settingsOpen, onCloseSettings }: PIPContainerProps) {
+export function PIPContainer({ settingsOpen, onCloseSettings, settingsPriority }: PIPContainerProps) {
   const { pipType, closePIP, expandContent } = useApp();
 
   return (
     <>
-      {settingsOpen && <SettingsPIP onClose={onCloseSettings} />}
+      {settingsOpen && (
+        settingsPriority
+          ? (
+            <div className="fixed inset-0 z-[1000000001] pointer-events-none [&>*]:pointer-events-auto">
+              <SettingsPIP onClose={onCloseSettings} />
+            </div>
+          )
+          : <SettingsPIP onClose={onCloseSettings} />
+      )}
       {pipType === "eligibility" && <EligibilityPIP onClose={closePIP} />}
       {pipType === "document" && <DocumentsPIP onClose={closePIP} />}
       {pipType === "expand" && expandContent && <ExpandPIP onClose={closePIP} title={expandContent.title} content={expandContent.content} />}

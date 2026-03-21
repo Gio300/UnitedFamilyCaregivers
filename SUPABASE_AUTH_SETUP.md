@@ -1,10 +1,12 @@
 # Supabase Auth Configuration for UFCi
 
-## 1. Email branding (UFCi instead of Supabase)
+## 1. Email branding (United Family Caregiver instead of Supabase)
+
+**Note:** This is done in the Supabase Dashboard, not via SQL.
 
 1. Go to **Supabase Dashboard** → **Authentication** → **Email Templates**
-2. Edit each template (Confirm signup, Magic Link, etc.)
-3. Change the sender name and any "Supabase" references to **UFCi**
+2. Edit each template (Confirm signup, Magic Link, Reset Password, etc.)
+3. Change the sender name and any "Supabase" references to **United Family Caregiver** (or UFCi)
 4. For custom "from" address, use **Project Settings** → **Auth** → **SMTP Settings** (requires custom SMTP)
 
 ## 2. Verification redirect and thank-you page
@@ -18,8 +20,7 @@
    - `http://localhost:3000/auth/callback` (for local dev)
 
 4. The app uses `/auth/callback` to:
-   - Complete email verification
-   - Show "Thank you for verifying your email"
-   - Redirect to login or dashboard
+   - **Signup verification:** Complete email verification → redirect to **login** (not dashboard)
+   - **Password reset:** Set session from recovery link → redirect to `/reset-password` to set new password → redirect to login
 
-Signup already passes `emailRedirectTo` so verification links will go to `/auth/callback`.
+Signup passes `emailRedirectTo` so verification links go to `/auth/callback`. After verification, users are sent to the login screen to sign in.

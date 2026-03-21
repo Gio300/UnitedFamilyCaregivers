@@ -39,6 +39,10 @@ interface AppContextValue {
   setDeviceType: (d: "desktop" | "tablet" | "mobile") => void;
   textSize: "small" | "medium" | "large";
   setTextSize: (t: "small" | "medium" | "large") => void;
+  textScalePx: number;
+  setTextScalePx: (v: number) => void;
+  pageScale: number;
+  setPageScale: (v: number) => void;
   resetSettings: () => void;
   activeClientId: string | null;
   setActiveClientId: (id: string | null) => void;
@@ -68,6 +72,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [accentColor, setAccentColorState] = useState<AccentColor>("emerald");
   const [deviceType, setDeviceTypeState] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [textSize, setTextSizeState] = useState<"small" | "medium" | "large">("medium");
+  const [textScalePx, setTextScalePxState] = useState(16);
+  const [pageScale, setPageScaleState] = useState(1);
   const [activeClientId, setActiveClientIdState] = useState<string | null>(null);
   const [chatResetKey, setChatResetKey] = useState(0);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
@@ -75,6 +81,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const chatSessionsRef = useRef<ChatSession[]>([]);
   chatSessionsRef.current = chatSessions;
+  const scaleRef = useRef({ textScalePx: 16, pageScale: 1 });
+  scaleRef.current = { textScalePx, pageScale };
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string }[]>([]);
 
@@ -127,25 +135,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setTextSize = useCallback((t: "small" | "medium" | "large") => {
     setTextSizeState(t);
     document.documentElement.setAttribute("data-text-size", t);
-    document.documentElement.style.fontSize = t === "small" ? "14px" : t === "large" ? "18px" : "16px";
+    const px = t === "small" ? 14 : t === "large" ? 18 : 16;
+    document.documentElement.style.setProperty("--ufci-text-base", `${px}px`);
+    document.documentElement.style.fontSize = `${px}px`;
     localStorage.setItem("ufci_text_size", t);
   }, []);
+
+  const applyFontScale = useCallback((tpx: number, ps: number) => {
+    document.documentElement.style.setProperty("--ufci-text-base", `${tpx}px`);
+    document.documentElement.style.setProperty("--ufci-scale", String(ps));
+    document.documentElement.style.fontSize = `${tpx * ps}px`;
+  }, []);
+
+  const setTextScalePx = useCallback((v: number) => {
+    setTextScalePxState(v);
+    const ps = scaleRef.current.pageScale;
+    applyFontScale(v, ps);
+    localStorage.setItem("ufci_text_scale_px", String(v));
+  }, [applyFontScale]);
+
+  const setPageScale = useCallback((v: number) => {
+    setPageScaleState(v);
+    const tpx = scaleRef.current.textScalePx;
+    applyFontScale(tpx, v);
+    localStorage.setItem("ufci_page_scale", String(v));
+  }, [applyFontScale]);
 
   const resetSettings = useCallback(() => {
     setThemeState("light");
     setAccentColorState("emerald");
     setDeviceTypeState("desktop");
     setTextSizeState("medium");
+    setTextScalePxState(16);
+    setPageScaleState(1);
     document.documentElement.classList.remove("dark");
     document.documentElement.setAttribute("data-accent", "emerald");
     document.documentElement.setAttribute("data-device", "desktop");
     document.documentElement.setAttribute("data-text-size", "medium");
+    document.documentElement.style.setProperty("--ufci-text-base", "16px");
     document.documentElement.style.fontSize = "16px";
+    document.documentElement.style.setProperty("--ufci-scale", "1");
     localStorage.setItem("ufci_theme", "light");
     localStorage.setItem("ufci_accent", "emerald");
     localStorage.setItem("ufci_device", "desktop");
     localStorage.setItem("ufci_text_size", "medium");
-    localStorage.setItem("ufci_settings", JSON.stringify({ deviceType: "desktop", textSize: "medium" }));
+    localStorage.setItem("ufci_text_scale_px", "16");
+    localStorage.setItem("ufci_page_scale", "1");
+    localStorage.setItem("ufci_settings", JSON.stringify({ deviceType: "desktop", textSize: "medium", textScalePx: 16, pageScale: 1 }));
   }, []);
 
   const resetChat = useCallback(() => {
@@ -167,11 +203,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     const ts = (localStorage.getItem("ufci_text_size") || "medium") as "small" | "medium" | "large";
+    const tpx = parseInt(localStorage.getItem("ufci_text_scale_px") || "16", 10) || 16;
+    const ps = parseFloat(localStorage.getItem("ufci_page_scale") || "1") || 1;
     setTheme(t);
     setAccentColor(c);
     setDeviceType(d);
     setTextSize(ts);
+    setTextScalePxState(Math.min(24, Math.max(12, tpx)));
+    setPageScaleState(Math.min(1.5, Math.max(0.75, ps)));
   }, [setTheme, setAccentColor, setDeviceType, setTextSize]);
+
+  useEffect(() => {
+    const tpx = Math.min(24, Math.max(12, parseInt(localStorage.getItem("ufci_text_scale_px") || "16", 10) || 16));
+    const ps = Math.min(1.5, Math.max(0.75, parseFloat(localStorage.getItem("ufci_page_scale") || "1") || 1));
+    document.documentElement.style.setProperty("--ufci-text-base", `${tpx}px`);
+    document.documentElement.style.setProperty("--ufci-scale", String(ps));
+    document.documentElement.style.fontSize = `${tpx * ps}px`;
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -222,6 +270,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setDeviceType,
         textSize,
         setTextSize,
+        textScalePx,
+        setTextScalePx,
+        pageScale,
+        setPageScale,
         resetSettings,
         activeClientId,
         setActiveClientId,

@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "UFCi",
   description: "NV Care Solutions Inc. – Serving Nevada and Arizona",
+  viewport: { width: "device-width", initialScale: 1 },
 };
 
 export default function RootLayout({

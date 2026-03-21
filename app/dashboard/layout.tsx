@@ -27,10 +27,19 @@ export default function DashboardLayout({
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         router.replace("/login");
         return;
+      }
+      const user = session.user;
+      const { data: profile } = await supabase.from("profiles").select("id").eq("id", user.id).single();
+      if (!profile) {
+        await supabase.from("profiles").upsert({
+          id: user.id,
+          full_name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split("@")[0] ?? "",
+          role: user.user_metadata?.role ?? "client",
+        }, { onConflict: "id" });
       }
       setReady(true);
     });
@@ -82,14 +91,18 @@ export default function DashboardLayout({
               </div>
             ) : (
               <>
-                <DashboardMainContent />
+                <div className="flex-1 flex min-h-0 min-w-0">
+                  <DashboardMainContent />
+                  <RightSidebar />
+                </div>
               </>
             )}
           </main>
         </div>
-        <PIPContainer settingsOpen={settingsOpen} onCloseSettings={() => setSettingsOpen(false)} />
+        <PIPContainer settingsOpen={settingsOpen} onCloseSettings={() => setSettingsOpen(false)} settingsPriority={showOnboarding} />
         {showOnboarding && (
           <OnboardingTour
+            onOpenSettings={() => setSettingsOpen(true)}
             onComplete={async () => {
               setShowOnboarding(false);
               const { data: { user } } = await supabase.auth.getUser();

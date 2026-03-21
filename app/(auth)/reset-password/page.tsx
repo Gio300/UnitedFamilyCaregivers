@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-export default function SignupPage() {
-  const [email, setEmail] = useState("");
+export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<"client" | "caregiver" | "csr_admin" | "management_admin">("client");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -21,79 +19,41 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
     try {
-      const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName }, emailRedirectTo: redirectTo },
-      });
+      const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      if (data.user) {
-        await supabase.from("profiles").upsert({
-          id: data.user.id,
-          full_name: fullName,
-          role,
-          updated_at: new Date().toISOString(),
-        });
-      }
-      router.push("/dashboard");
-      router.refresh();
+      setSuccess(true);
+      setTimeout(() => router.replace("/login"), 2000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Sign up failed");
+      setError(err instanceof Error ? err.message : "Failed to update password");
     } finally {
       setLoading(false);
     }
   }
 
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-sm space-y-6 p-6 rounded-xl bg-white shadow-lg border border-slate-200 text-center">
+          <h1 className="text-2xl font-bold text-emerald-700">Password updated</h1>
+          <p className="text-sm text-slate-600">
+            Your password has been reset. Redirecting to sign in...
+          </p>
+          <Link href="/login" className="inline-block text-sm text-emerald-600 hover:underline">
+            Sign in now
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm space-y-6 p-6 rounded-xl bg-white shadow-lg border border-slate-200">
-        <h1 className="text-2xl font-bold text-center text-emerald-700">UFCi</h1>
+        <h1 className="text-2xl font-bold text-center text-emerald-700">Set new password</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="fullName" className="block text-sm font-medium mb-1 text-slate-700">
-              Full name
-            </label>
-            <input
-              id="fullName"
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
-            />
-          </div>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-1 text-slate-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
-            />
-          </div>
-          <div>
-            <label htmlFor="role" className="block text-sm font-medium mb-1 text-slate-700">
-              I am a
-            </label>
-            <select
-              id="role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as typeof role)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
-            >
-              <option value="client">Client / Family</option>
-              <option value="caregiver">Caregiver</option>
-              <option value="csr_admin">CSR / Admin</option>
-              <option value="management_admin">Management Admin</option>
-            </select>
-          </div>
-          <div>
             <label htmlFor="password" className="block text-sm font-medium mb-1 text-slate-700">
-              Password
+              New password
             </label>
             <div className="relative">
               <input
@@ -103,6 +63,7 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                placeholder="Enter new password"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 pr-10 text-sm text-slate-800 focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
               />
               <button
@@ -134,13 +95,12 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full rounded-lg bg-slate-800 text-white py-2.5 font-medium hover:bg-slate-700 disabled:opacity-50 transition-colors"
           >
-            {loading ? "Creating account..." : "Sign up"}
+            {loading ? "Updating..." : "Update password"}
           </button>
         </form>
         <p className="text-center text-sm text-slate-600">
-          Already have an account?{" "}
           <Link href="/login" className="underline">
-            Sign in
+            Back to sign in
           </Link>
         </p>
       </div>
