@@ -147,7 +147,7 @@ export function ChatPanel() {
         return;
       }
 
-      const apiBase = getApiBase();
+      let apiBase = getApiBase();
       if (!apiBase) {
         setMessages((m) => [...m, { role: "assistant", content: "API base URL not configured. Set NEXT_PUBLIC_API_BASE in GitHub Secrets or .env.local." }]);
         return;
@@ -155,25 +155,46 @@ export function ChatPanel() {
 
       const history = messages.map(({ role, content }) => ({ role, content }));
       const useTools = userRole === "csr_admin" || userRole === "management_admin";
-      const fetchUrl = `${apiBase}/api/chat?stream=1${useTools ? "&tools=1" : ""}`;
-      const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), 20000);
-      const res = await fetch(fetchUrl, {
-        method: "POST",
-        signal: controller.signal,
+      const body = JSON.stringify({
+        message: userMsg.content,
+        history,
+        attachments: userMsg.attachments,
+        userContext: { role: userRole || undefined, activeClientId: activeClientId || undefined },
+      });
+      const fetchOpts = {
+        method: "POST" as const,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
           Accept: "text/event-stream",
         },
-        body: JSON.stringify({
-          message: userMsg.content,
-          history,
-          attachments: userMsg.attachments,
-          userContext: { role: userRole || undefined, activeClientId: activeClientId || undefined },
-        }),
-      });
-      clearTimeout(timeoutId);
+        body,
+      };
+      const url = (base: string) => `${base}/api/chat?stream=1${useTools ? "&tools=1" : ""}`;
+
+      let res: Response;
+      try {
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 15000);
+        res = await fetch(url(apiBase), { ...fetchOpts, signal: controller.signal });
+        clearTimeout(timeoutId);
+      } catch (primaryErr) {
+        clearTimeout(timeoutId);
+        const isAbort = primaryErr instanceof Error && (primaryErr.message.includes("aborted") || primaryErr.message.includes("timeout"));
+        if (isAbort && apiBase.includes("unitedfamilycaregivers")) {
+          try {
+            const fallbackController = new AbortController();
+            timeoutId = setTimeout(() => fallbackController.abort(), 20000);
+            res = await fetch(url("http://localhost:7501"), { ...fetchOpts, signal: fallbackController.signal });
+            clearTimeout(timeoutId);
+          } catch {
+            setMessages((m) => [...m, { role: "assistant", content: "Request timed out. If you're on the same network as the server, ensure AI Gateway is running. External users: API works from the internet." }]);
+            return;
+          }
+        } else {
+          throw primaryErr;
+        }
+      }
 
       if (!res.ok) {
         const err = await res.text();
@@ -211,8 +232,9 @@ export function ChatPanel() {
     } catch (err) {
       if (timeoutId) clearTimeout(timeoutId);
       const errMsg = err instanceof Error ? err.message : "Unknown error";
-      const displayMsg = errMsg.includes("aborted") || errMsg.includes("timeout")
-        ? "Request timed out. If using api.unitedfamilycaregivers.com, add the domain to Cloudflare (see CLOUDFLARE_IPV4_FIX.md). Or use a quick tunnel: scripts\\start-tunnel-and-get-url.ps1"
+      const isAbort = errMsg.includes("aborted") || errMsg.includes("timeout");
+      const displayMsg = isAbort
+        ? "Request timed out. See UFC_AI_FIX.md — fix DNS to use the tunnel, or use a quick tunnel (scripts\\start-tunnel-and-get-url.ps1)."
         : `Error: ${errMsg}`;
       setMessages((m) => [...m, { role: "assistant", content: displayMsg }]);
     } finally {

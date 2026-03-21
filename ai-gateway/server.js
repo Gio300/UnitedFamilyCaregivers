@@ -17,6 +17,8 @@ const allowedOrigins = [
   "https://gio300.github.io",
   "http://localhost:7500",
   "http://127.0.0.1:7500",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
 ];
 app.use(cors({
   origin: (origin, cb) => {

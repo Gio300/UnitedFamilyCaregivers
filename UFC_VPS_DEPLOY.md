@@ -1,6 +1,18 @@
-# UFC VPS Deployment (Docker)
+# UFC Deployment (Docker)
 
-Deploy the United Family Caregivers API on a VPS using Docker. Mirrors KloudyKare's serving architecture (Caddy + direct DNS, no tunnel).
+Deploy the United Family Caregivers API. Supports: local PC with port forwarding, or VPS.
+
+## Local PC with Port Forwarding (Current Setup)
+
+If you run on your PC with ports 80/443 forwarded to your public IP:
+
+1. **Kloudy Caddy** (`caddy-caddy-1`) handles api.unitedfamilycaregivers.com and routes `/api/*` to host:7501
+2. **UFC Docker** (`UnitedFamilyCaregivers/docker`): AI Gateway (7501) + Ollama
+3. **AnythingLLM**: Left untouched. UFC uses its own `docker-ollama-1` container.
+
+Start UFC stack: `cd UnitedFamilyCaregivers/docker && docker compose up -d`
+
+---
 
 ## Architecture
 
