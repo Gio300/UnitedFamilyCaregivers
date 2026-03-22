@@ -1,3 +1,6 @@
+# SUPABASE_DATABASE_URL secret must be set in Settings > Secrets > Actions.
+# Format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-REGION.pooler.supabase.com:5432/postgres
+# Use Session pooler URL from Supabase Dashboard > Settings > Database. Encode @ in password as %40.
 name: Push Supabase Migrations
 on:
   push:
@@ -12,6 +15,19 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+
+      - name: Check SUPABASE_DATABASE_URL is configured
+        env:
+          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          if [ -z "$SUPABASE_DATABASE_URL" ]; then
+            echo "::error::SUPABASE_DATABASE_URL secret is not set. Add it in repo Settings > Secrets and variables > Actions. Format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@HOST.pooler.supabase.com:5432/postgres"
+            exit 1
+          fi
+          if [[ "$SUPABASE_DATABASE_URL" != postgres* ]]; then
+            echo "::error::SUPABASE_DATABASE_URL must start with postgresql:// or postgres://"
+            exit 1
+          fi
 
       - name: Push migrations
         env:
