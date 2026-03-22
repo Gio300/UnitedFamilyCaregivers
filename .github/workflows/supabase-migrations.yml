@@ -1,3 +1,4 @@
+# Runs on push to supabase/ or this workflow file
 name: Push Supabase Migrations
 on:
   push:
