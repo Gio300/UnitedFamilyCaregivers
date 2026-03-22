@@ -2,7 +2,7 @@ name: Push Supabase Migrations
 on:
   push:
     branches: [main]
-    paths: ['supabase/migrations/**', 'supabase/config.toml']
+    paths: ['supabase/migrations/**', 'supabase/config.toml', '.github/workflows/supabase-migrations.yml']
 jobs:
   push:
     runs-on: ubuntu-latest
