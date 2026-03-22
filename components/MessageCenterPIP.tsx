@@ -94,7 +94,7 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
             .limit(10);
           asClient = data || [];
         }
-        const merged = [...(asCaregiver || []), ...asClient].sort((a: { start_at: string }, b: { start_at: string }) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()).slice(0, 20);
+        const merged = ([...(asCaregiver || []), ...asClient] as { start_at: string }[]).sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()).slice(0, 20);
         return { data: merged };
       })(),
     ]);
