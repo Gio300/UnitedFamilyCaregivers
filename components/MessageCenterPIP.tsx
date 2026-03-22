@@ -119,7 +119,7 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
     (activityRes.data || []).forEach((a) => {
       combined.push({ type: "activity", id: a.id, data: a });
     });
-    ((apptsRes as { data?: unknown[] })?.data || []).forEach((a: { id: string; title: string; start_at: string; status: string; client_id?: string; caregiver_id?: string }) => {
+    (((apptsRes as { data?: unknown[] })?.data || []) as { id: string; title: string; start_at: string; status: string; client_id?: string; caregiver_id?: string }[]).forEach((a) => {
       combined.push({ type: "appointment", id: a.id, data: a });
     });
 
