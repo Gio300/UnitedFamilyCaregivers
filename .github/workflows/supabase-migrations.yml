@@ -15,9 +15,5 @@ jobs:
 
       - name: Push migrations
         env:
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-        run: |
-          ENCODED_PASS=$(python3 -c "import urllib.parse,os; print(urllib.parse.quote(os.environ.get('SUPABASE_DB_PASSWORD',''), safe=''))")
-          DB_URL="postgresql://postgres:${ENCODED_PASS}@db.${SUPABASE_PROJECT_REF}.supabase.co:5432/postgres"
-          supabase db push --db-url "$DB_URL"
+          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: supabase db push --db-url "$SUPABASE_DATABASE_URL"
