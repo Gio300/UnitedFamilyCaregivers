@@ -59,11 +59,16 @@ export function ProfilesPanel() {
       // Temporary: fallback to test_profiles when no real profiles (for dev/testing)
       const useTestProfiles = !profs?.length;
       if (useTestProfiles) {
-        const { data: testProfs } = await supabase
-          .from("test_profiles")
-          .select("id, full_name, role, approved_at")
-          .order("full_name");
-        profs = testProfs || [];
+        try {
+          const { data: testProfs, error } = await supabase
+            .from("test_profiles")
+            .select("id, full_name, role, approved_at")
+            .order("full_name");
+          if (!error) profs = testProfs || [];
+          else profs = [];
+        } catch {
+          profs = [];
+        }
       }
 
       if (!profs?.length) {

@@ -7,6 +7,7 @@ import { DocumentsPIP } from "./DocumentsPIP";
 import { ExpandPIP } from "./ExpandPIP";
 import { SupervisorApprovalPIP } from "./SupervisorApprovalPIP";
 import { MessageCenterPIP } from "./MessageCenterPIP";
+import { UnifiedNotificationsPIP } from "./UnifiedNotificationsPIP";
 
 interface PIPContainerProps {
   settingsOpen: boolean;
@@ -33,7 +34,7 @@ export function PIPContainer({ settingsOpen, onCloseSettings, settingsPriority }
       {pipType === "expand" && expandContent && <ExpandPIP onClose={closePIP} title={expandContent.title} content={expandContent.content} />}
       {pipType === "activity" && expandContent && <ExpandPIP onClose={closePIP} title={expandContent.title} content={expandContent.content} />}
       {pipType === "supervisor_approval" && <SupervisorApprovalPIP onClose={closePIP} />}
-      {pipType === "message_center" && <MessageCenterPIP onClose={closePIP} />}
+      {pipType === "message_center" && <UnifiedNotificationsPIP onClose={closePIP} />}
     </>
   );
 }

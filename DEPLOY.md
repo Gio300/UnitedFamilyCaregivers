@@ -3,7 +3,9 @@
 ## GitHub Pages (UI)
 
 1. **Settings > Pages** – Set **Source** to **GitHub Actions** (not "Deploy from a branch")
-2. **Secrets** – Ensure `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_LIVEKIT_URL`, `NEXT_PUBLIC_API_BASE` are set
+2. **Secrets** – In Settings > Secrets and variables > Actions:
+   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_LIVEKIT_URL`, `NEXT_PUBLIC_API_BASE`
+   - `SUPABASE_DATABASE_URL` (one-time) – Session pooler URL from Supabase Dashboard > Settings > Database, for the Push Supabase Migrations workflow. Encode `@` in password as `%40`.
 3. **Deploy** – Push to `main` triggers the "Deploy to GitHub Pages" workflow
 4. **Live URL** – https://gio300.github.io/UnitedFamilyCaregivers/
 

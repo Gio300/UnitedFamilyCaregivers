@@ -13,7 +13,7 @@ interface Message {
 }
 
 export function ChatPanel() {
-  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments, activeClientId } = useApp();
+  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, updateChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments, activeClientId } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
@@ -59,7 +59,7 @@ export function ChatPanel() {
     const msgs = messagesRef.current;
     if (msgs.length > 0) {
       addChatSession({
-        id: `session_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `session_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         messages: [...msgs],
         preview: msgs[0]?.content?.slice(0, 60) || "New chat",
         createdAt: Date.now(),
@@ -73,6 +73,14 @@ export function ChatPanel() {
     const session = loadChatSession(currentSessionId);
     if (session) setMessages(session.messages);
   }, [currentSessionId, loadChatSession]);
+
+  useEffect(() => {
+    if (!currentSessionId || messages.length === 0) return;
+    const t = setTimeout(() => {
+      updateChatSession(currentSessionId, { messages, preview: messages[0]?.content?.slice(0, 60) || "Chat" });
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [currentSessionId, messages, updateChatSession]);
 
   useEffect(() => {
     if (pendingAttachments.length > 0) {
@@ -268,34 +276,65 @@ export function ChatPanel() {
               {m.content !== "(attachment)" && <p className="whitespace-pre-wrap">{m.content}</p>}
               {m.attachments?.length ? (
                 <div className="mt-2 space-y-1">
-                  {m.attachments.map((a, j) => (
-                    <a key={j} href={a.url} target="_blank" rel="noopener noreferrer" className="block text-xs underline truncate">
-                      {a.name}
-                    </a>
-                  ))}
+                  {m.attachments.map((a, j) => {
+                    const isImg = /\.(jpe?g|png|gif|webp|avif)(\?|$)/i.test(a.url);
+                    return isImg ? (
+                      <button
+                        key={j}
+                        type="button"
+                        onClick={() => openPIP("expand", {
+                          title: a.name,
+                          content: (
+                            <div>
+                              <img src={a.url} alt={a.name} className="max-w-full max-h-[80vh] object-contain rounded" />
+                            </div>
+                          ),
+                        })}
+                        className="block"
+                      >
+                        <img src={a.url} alt={a.name} className="max-h-24 rounded border border-slate-200 dark:border-zinc-700 object-contain cursor-pointer hover:opacity-90" />
+                      </button>
+                    ) : (
+                      <a key={j} href={a.url} target="_blank" rel="noopener noreferrer" className="block text-xs underline truncate">
+                        {a.name}
+                      </a>
+                    );
+                  })}
                 </div>
               ) : null}
               {(m.content.length > 100 || m.attachments?.length) && (
                 <button
                   type="button"
-                  onClick={() => openPIP("expand", {
-                    title: "Message",
-                    content: (
-                      <div className="space-y-2">
-                        <p className="whitespace-pre-wrap">{m.content}</p>
-                        {m.attachments?.length ? (
-                          <div>
-                            <p className="font-medium text-sm mb-1">Attachments</p>
-                            {m.attachments.map((a, j) => (
-                              <a key={j} href={a.url} target="_blank" rel="noopener noreferrer" className="block text-sm text-emerald-600 underline">
-                                {a.name}
-                              </a>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    ),
-                  })}
+                  onClick={() => {
+                    const isImage = (url: string) => /\.(jpe?g|png|gif|webp|avif)(\?|$)/i.test(url) || /image\//i.test(url);
+                    openPIP("expand", {
+                      title: "Message",
+                      content: (
+                        <div className="space-y-2">
+                          {m.content !== "(attachment)" && <p className="whitespace-pre-wrap">{m.content}</p>}
+                          {m.attachments?.length ? (
+                            <div className="space-y-2">
+                              <p className="font-medium text-sm">Attachments</p>
+                              {m.attachments.map((a, j) =>
+                                isImage(a.url) ? (
+                                  <div key={j} className="rounded overflow-hidden border border-slate-200 dark:border-zinc-700">
+                                    <img src={a.url} alt={a.name} className="max-w-full max-h-96 object-contain" />
+                                    <a href={a.url} target="_blank" rel="noopener noreferrer" className="block text-xs text-emerald-600 mt-1">
+                                      {a.name}
+                                    </a>
+                                  </div>
+                                ) : (
+                                  <a key={j} href={a.url} target="_blank" rel="noopener noreferrer" className="block text-sm text-emerald-600 underline">
+                                    {a.name}
+                                  </a>
+                                )
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      ),
+                    });
+                  }}
                   className="mt-2 text-xs text-emerald-600 hover:underline"
                 >
                   View / Expand

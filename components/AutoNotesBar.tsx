@@ -19,7 +19,7 @@ interface AutoNotesBarProps {
 }
 
 export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
-  const { openPIP } = useApp();
+  const { openPIP, autoNotesScope, setAutoNotesScope, currentSessionId } = useApp();
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -29,6 +29,10 @@ export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
 
   useEffect(() => {
     if (!targetId) {
+      setItems([]);
+      return;
+    }
+    if (autoNotesScope === "this_chat" && !currentSessionId) {
       setItems([]);
       return;
     }
@@ -42,8 +46,11 @@ export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
     } else {
       q = q.eq("user_id", targetId).is("client_id", null);
     }
+    if (autoNotesScope === "this_chat" && currentSessionId) {
+      q = q.eq("session_id", currentSessionId);
+    }
     q.then(({ data }) => setItems(data || []));
-  }, [targetId, clientId, supabase]);
+  }, [targetId, clientId, supabase, autoNotesScope, currentSessionId]);
 
   const handleReview = () => {
     openPIP("activity", {
@@ -114,6 +121,22 @@ export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
       </button>
       {expanded && (
         <div className="px-3 pb-3 space-y-2">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAutoNotesScope("this_chat")}
+              className={`px-2 py-1 rounded text-xs font-medium ${autoNotesScope === "this_chat" ? "bg-slate-200 dark:bg-zinc-700" : "bg-slate-100 dark:bg-zinc-800"}`}
+            >
+              This chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setAutoNotesScope("all")}
+              className={`px-2 py-1 rounded text-xs font-medium ${autoNotesScope === "all" ? "bg-slate-200 dark:bg-zinc-700" : "bg-slate-100 dark:bg-zinc-800"}`}
+            >
+              All notes
+            </button>
+          </div>
           <div className="max-h-32 overflow-y-auto space-y-1 text-xs">
             {items.length === 0 ? (
               <p className="py-2 text-slate-500 dark:text-slate-400">Actions taken on this profile will appear here.</p>

@@ -24,10 +24,18 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        supabase.from("profiles").select("full_name, role, approved_at").eq("id", user.id).single().then(({ data }) => {
+        supabase.from("profiles").select("full_name, role, approved_at").eq("id", user.id).single().then(({ data, error }) => {
+          if (error) {
+            setUserName(user.email?.split("@")[0] || "User");
+            setIsSupervisor(false);
+            return;
+          }
           setUserName(data?.full_name || user.email?.split("@")[0] || "User");
           const approved = !!data?.approved_at;
           setIsSupervisor((data?.role === "management_admin" || data?.role === "csr_admin") && approved);
+        }).catch(() => {
+          setUserName(user.email?.split("@")[0] || "User");
+          setIsSupervisor(false);
         });
       }
     });
@@ -40,7 +48,8 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
       .select("id", { count: "exact", head: true })
       .in("role", ["csr_admin", "management_admin"])
       .is("approved_at", null)
-      .then(({ count }) => setPendingCount(count ?? 0));
+      .then(({ count, error }) => { setPendingCount(error ? 0 : (count ?? 0)); })
+      .catch(() => setPendingCount(0));
   }, [isSupervisor, supabase]);
 
   async function handleLogout() {
@@ -113,38 +122,20 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
             <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
         </button>
-        {isSupervisor && pendingCount > 0 && (
-          <button
-            type="button"
-            onClick={() => openPIP("supervisor_approval")}
-            className="relative p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
-            title="Pending approvals"
-            aria-label="Pending approvals"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-              {pendingCount}
-            </span>
-          </button>
-        )}
         <button
           type="button"
           onClick={() => openPIP("message_center")}
           className="relative p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
-          title="Message center"
-          aria-label="Message center"
+          title="Notifications"
+          aria-label="Notifications"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-          {messageCenterCount > 0 && (
+          {(messageCenterCount + pendingCount) > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-              {messageCenterCount > 99 ? "99+" : messageCenterCount}
+              {(messageCenterCount + pendingCount) > 99 ? "99+" : messageCenterCount + pendingCount}
             </span>
           )}
         </button>

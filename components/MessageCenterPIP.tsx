@@ -11,7 +11,7 @@ export type MessageCenterItem =
   | { type: "activity"; id: string; data: { action_type: string; details?: Record<string, unknown> | string; created_at: string; client_id?: string } }
   | { type: "appointment"; id: string; data: { title: string; start_at: string; status: string; client_id?: string; caregiver_id?: string } };
 
-export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
+export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; embedded?: boolean }) {
   const [items, setItems] = useState<MessageCenterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"list" | "detail">("list");
@@ -165,22 +165,24 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
   const typeLabel = (t: string) =>
     ({ reminder: "Reminder", call_note: "Call", incoming_email: "Email", sent_message: "Sent", activity: "Activity", appointment: "Appointment" }[t] || t);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div
-        className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-zinc-700 shrink-0">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            Message Center
-            {unreadCount > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-                {unreadCount}
-              </span>
-            )}
-          </h2>
-          <div className="flex items-center gap-1">
+  const inner = (
+    <div
+      className={embedded ? "flex flex-col flex-1 min-h-0" : "w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl"}
+      onClick={embedded ? undefined : (e) => e.stopPropagation()}
+    >
+      {(!embedded || view === "detail") && (
+        <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 dark:border-zinc-700 shrink-0">
+          {!embedded && (
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              Message Center
+              {unreadCount > 0 && (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                  {unreadCount}
+                </span>
+              )}
+            </h2>
+          )}
+          <div className={`flex items-center gap-1 ${embedded ? "w-full justify-end" : ""}`}>
             {view === "detail" && (
               <button
                 type="button"
@@ -204,20 +206,23 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
               </svg>
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-700"
-              aria-label="Close"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
+            {!embedded && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-700"
+                aria-label="Close"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
+      )}
 
-        <div className="flex-1 overflow-y-auto p-4">
+      <div className={`flex-1 overflow-y-auto ${embedded ? "p-4" : "p-4"}`}>
           {loading ? (
             <p className="text-sm text-slate-500">Loading...</p>
           ) : view === "detail" && selectedItem ? (
@@ -316,6 +321,12 @@ export function MessageCenterPIP({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
+  );
+
+  if (embedded) return inner;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      {inner}
     </div>
   );
 }

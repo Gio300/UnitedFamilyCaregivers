@@ -21,6 +21,7 @@ export interface ChatSession {
   messages: { role: "user" | "assistant"; content: string; attachments?: { name: string; url: string }[] }[];
   preview: string;
   createdAt: number;
+  title?: string;
 }
 
 interface AppContextValue {
@@ -54,11 +55,15 @@ interface AppContextValue {
   setRightSidebarOpen: (v: boolean) => void;
   chatSessions: ChatSession[];
   addChatSession: (session: ChatSession) => void;
+  updateChatSession: (id: string, updates: Partial<Pick<ChatSession, "title" | "messages" | "preview">>) => void;
+  deleteChatSession: (id: string) => void;
   loadChatSession: (id: string) => ChatSession | null;
   openChatSession: (id: string) => void;
   currentSessionId: string | null;
   pendingAttachments: { name: string; url: string }[];
   setPendingAttachments: (files: { name: string; url: string }[]) => void;
+  autoNotesScope: "this_chat" | "all";
+  setAutoNotesScope: (scope: "this_chat" | "all") => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -85,10 +90,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   scaleRef.current = { textScalePx, pageScale };
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string }[]>([]);
+  const [autoNotesScope, setAutoNotesScopeState] = useState<"this_chat" | "all">("all");
 
   const openChatSession = useCallback((id: string) => {
     setCurrentSessionIdState(id);
   }, []);
+
+  const isValidUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
   const addChatSession = useCallback((session: ChatSession) => {
     setChatSessions((prev) => {
@@ -96,6 +104,85 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const next = [session, ...filtered].slice(0, 50);
       if (typeof window !== "undefined") localStorage.setItem("ufci_chat_sessions", JSON.stringify(next));
       return next;
+    });
+    if (typeof window === "undefined") return;
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      if (!user || !isValidUuid(session.id)) return;
+      const supabase = createClient();
+      supabase.from("chat_sessions").upsert({
+        id: session.id,
+        user_id: user.id,
+        title: session.preview?.slice(0, 200) || "Chat",
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" }).then(() => {
+        supabase.from("chat_messages").delete().eq("session_id", session.id).then(() => {
+          const inserts = session.messages
+            .filter((m) => m.role !== "system")
+            .map((m, i) => ({
+              session_id: session.id,
+              user_id: user.id,
+              role: m.role,
+              content: m.content,
+              attachments: (m.attachments || []).length ? (m.attachments || []) : [],
+              created_at: new Date(session.createdAt + i * 1000).toISOString(),
+            }));
+          if (inserts.length) supabase.from("chat_messages").insert(inserts).then(() => {});
+        });
+      });
+    });
+  }, []);
+
+  const updateChatSession = useCallback((id: string, updates: Partial<Pick<ChatSession, "title" | "messages" | "preview">>) => {
+    setChatSessions((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx < 0) return prev;
+      const next = [...prev];
+      const s = next[idx];
+      next[idx] = {
+        ...s,
+        ...(updates.title !== undefined && { preview: updates.title, title: updates.title }),
+        ...(updates.preview !== undefined && { preview: updates.preview }),
+        ...(updates.messages !== undefined && { messages: updates.messages }),
+      };
+      if (typeof window !== "undefined") localStorage.setItem("ufci_chat_sessions", JSON.stringify(next));
+      return next;
+    });
+    if (typeof window === "undefined") return;
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      if (!user || !isValidUuid(id)) return;
+      const supabase = createClient();
+      const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (updates.title !== undefined) payload.title = updates.title;
+      if (updates.preview !== undefined) payload.title = updates.preview;
+      supabase.from("chat_sessions").update(payload).eq("id", id).eq("user_id", user.id).then();
+      if (updates.messages !== undefined) {
+        supabase.from("chat_messages").delete().eq("session_id", id).then(() => {
+          const inserts = updates.messages!
+            .filter((m) => m.role !== "system")
+            .map((m, i) => ({
+              session_id: id,
+              user_id: user.id,
+              role: m.role,
+              content: m.content,
+              attachments: (m.attachments || []).length ? (m.attachments || []) : [],
+              created_at: new Date(Date.now() - (updates.messages!.length - i) * 1000).toISOString(),
+            }));
+          if (inserts.length) supabase.from("chat_messages").insert(inserts).then(() => {});
+        });
+      }
+    });
+  }, []);
+
+  const deleteChatSession = useCallback((id: string) => {
+    setChatSessions((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      if (typeof window !== "undefined") localStorage.setItem("ufci_chat_sessions", JSON.stringify(next));
+      return next;
+    });
+    if (typeof window === "undefined") return;
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      if (!user || !isValidUuid(id)) return;
+      createClient().from("chat_sessions").update({ deleted_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id).then();
     });
   }, []);
 
@@ -232,6 +319,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from("chat_sessions")
+        .select("id, title, created_at, updated_at")
+        .eq("user_id", user.id)
+        .is("deleted_at", null)
+        .order("updated_at", { ascending: false })
+        .limit(50)
+        .then(({ data: sessions, error: se }) => {
+          if (se || !sessions?.length) return;
+          supabase
+            .from("chat_messages")
+            .select("session_id, role, content, attachments, created_at")
+            .in("session_id", sessions.map((s) => s.id))
+            .order("created_at", { ascending: true })
+            .then(({ data: msgs, error: me }) => {
+              if (me) return;
+              const bySession = new Map<string, { role: "user" | "assistant"; content: string; attachments?: { name: string; url: string }[] }[]>();
+              (msgs || []).forEach((m) => {
+                const list = bySession.get(m.session_id) || [];
+                list.push({
+                  role: m.role as "user" | "assistant",
+                  content: m.content,
+                  attachments: Array.isArray(m.attachments) ? m.attachments : (m.attachments ? JSON.parse(String(m.attachments || "[]")) : []),
+                });
+                bySession.set(m.session_id, list);
+              });
+              const loaded: ChatSession[] = sessions.map((s) => {
+                const messages = bySession.get(s.id) || [];
+                const preview = messages[0]?.content?.slice(0, 60) || s.title || "Chat";
+                return {
+                  id: s.id,
+                  messages,
+                  preview,
+                  createdAt: new Date(s.created_at).getTime(),
+                  title: s.title,
+                };
+              });
+              setChatSessions((prev) => {
+                const byId = new Map(prev.map((p) => [p.id, p]));
+                loaded.forEach((l) => byId.set(l.id, l));
+                const merged = Array.from(byId.values()).sort((a, b) => b.createdAt - a.createdAt).slice(0, 50);
+                localStorage.setItem("ufci_chat_sessions", JSON.stringify(merged));
+                return merged;
+              });
+            });
+        });
+    });
+  }, []);
+
+  useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
@@ -285,11 +426,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setRightSidebarOpen,
         chatSessions,
         addChatSession,
+        updateChatSession,
+        deleteChatSession,
         loadChatSession,
         openChatSession,
         currentSessionId,
         pendingAttachments,
         setPendingAttachments,
+        autoNotesScope,
+        setAutoNotesScope: setAutoNotesScopeState,
       }}
     >
       {children}

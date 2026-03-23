@@ -33,6 +33,10 @@ try {
     if ($livekit) { gh secret set NEXT_PUBLIC_LIVEKIT_URL --body $livekit }
     $apiBase = Get-EnvValue $envLocal "NEXT_PUBLIC_API_BASE"
     if ($apiBase) { gh secret set NEXT_PUBLIC_API_BASE --body $apiBase }
+    $livekitKey = Get-EnvValue $envLocal "LIVEKIT_API_KEY"
+    if ($livekitKey) { gh secret set LIVEKIT_API_KEY --body $livekitKey }
+    $livekitSecret = Get-EnvValue $envLocal "LIVEKIT_API_SECRET"
+    if ($livekitSecret) { gh secret set LIVEKIT_API_SECRET --body $livekitSecret }
     Write-Host "Secrets synced. Triggering redeploy..."
     gh workflow run deploy.yml
 } finally { Pop-Location }
