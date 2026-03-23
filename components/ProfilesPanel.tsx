@@ -51,34 +51,47 @@ export function ProfilesPanel({ embedded }: { embedded?: boolean } = {}) {
       }
 
       // Check if current user is admin (for search + Create profile UI)
-      const { data: myProfile } = await supabase.from("profiles").select("role, approved_at").eq("id", user.id).single();
-      setIsAdmin(
-        (myProfile?.role === "csr_admin" || myProfile?.role === "management_admin") && !!myProfile?.approved_at
-      );
+      let isAdminVal = false;
+      try {
+        const { data: myProfile, error: myErr } = await supabase.from("profiles").select("role, approved_at").eq("id", user.id).single();
+        if (!myErr && myProfile) {
+          isAdminVal = (myProfile.role === "csr_admin" || myProfile.role === "management_admin") && !!myProfile.approved_at;
+        }
+      } catch {
+        /* ignore */
+      }
+      setIsAdmin(isAdminVal);
 
-      // Try real profiles first
-      let { data: profs } = await supabase
-        .from("profiles")
-        .select("id, full_name, role, approved_at")
-        .order("full_name");
+      // Try real profiles first; on error, fallback to test_profiles
+      let profs: { id: string; full_name: string; role: string; approved_at: string | null }[] | null = null;
+      let useTestProfiles = false;
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, full_name, role, approved_at")
+          .order("full_name");
+        if (!error) profs = data;
+      } catch {
+        profs = null;
+      }
 
-      // Temporary: fallback to test_profiles when no real profiles (for dev/testing)
-      const useTestProfiles = !profs?.length;
-      if (useTestProfiles) {
+      if (!profs?.length) {
         try {
           const { data: testProfs, error } = await supabase
             .from("test_profiles")
             .select("id, full_name, role, approved_at")
             .order("full_name");
-          if (!error) profs = testProfs || [];
-          else profs = [];
+          if (!error && testProfs?.length) {
+            profs = testProfs;
+            useTestProfiles = true;
+          }
         } catch {
           profs = [];
         }
       }
 
       if (!profs?.length) {
-        setProfiles([]);
+        setAllProfiles([]);
         setLoading(false);
         return;
       }
@@ -186,9 +199,22 @@ export function ProfilesPanel({ embedded }: { embedded?: boolean } = {}) {
 
   if (!profiles.length) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         <p className="text-sm text-slate-400">No profiles yet.</p>
         <p className="text-xs text-slate-500">Profiles appear here as users sign up or are added.</p>
+        {isAdmin && (
+          <div className="space-y-2">
+            <Link
+              href="/signup"
+              className="block w-full py-2 rounded-lg bg-emerald-600 text-white text-center text-sm font-medium hover:bg-emerald-700"
+            >
+              Create profile
+            </Link>
+            <p className="text-xs text-slate-500">
+              Or run seed_test_minimal.sql and seed_message_center.sql in Supabase SQL Editor for test data.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -248,9 +274,20 @@ export function ProfilesPanel({ embedded }: { embedded?: boolean } = {}) {
               </button>
             )}
             {p.role === "caregiver" && p.clients && p.clients.length > 0 && (
-              <p className="text-slate-500 dark:text-slate-500 mt-1">
-                Clients: {p.clients.map((c) => c.full_name).join(", ")}
-              </p>
+              <>
+                <p className="text-slate-500 dark:text-slate-500 mt-1">
+                  Clients: {p.clients.map((c) => c.full_name).join(", ")}
+                </p>
+                {p.clients[0]?.id && (
+                  <button
+                    type="button"
+                    onClick={() => viewClient(p.clients![0].id)}
+                    className="mt-1 text-xs text-emerald-600 hover:underline"
+                  >
+                    View detail
+                  </button>
+                )}
+              </>
             )}
             {(p.role === "csr_admin" || p.role === "management_admin") &&
               p.recent_work &&

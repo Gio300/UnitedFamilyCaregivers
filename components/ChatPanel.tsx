@@ -293,9 +293,12 @@ export function ChatPanel() {
       if (timeoutId) clearTimeout(timeoutId);
       const errMsg = err instanceof Error ? err.message : "Unknown error";
       const isAbort = errMsg.includes("aborted") || errMsg.includes("timeout");
+      const isFailedFetch = errMsg.includes("fetch") || errMsg.includes("Failed to fetch");
       const displayMsg = isAbort
         ? "Request timed out. See UFC_AI_FIX.md — fix DNS to use the tunnel, or use a quick tunnel (scripts\\start-tunnel-and-get-url.ps1)."
-        : `Error: ${errMsg}`;
+        : isFailedFetch
+          ? "Failed to fetch. Set NEXT_PUBLIC_API_BASE in GitHub Secrets to your AI Gateway URL (e.g. Cloudflare tunnel, api.kloudykare.com). Ensure AI Gateway is running (cd ai-gateway && npm start)."
+          : `Error: ${errMsg}`;
       setMessages((m) => [...m, { role: "assistant", content: displayMsg }]);
     } finally {
       setLoading(false);
