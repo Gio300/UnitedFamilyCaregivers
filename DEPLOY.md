@@ -47,6 +47,8 @@ CREATE POLICY "Users manage own reminders" ON public.reminders FOR ALL USING (au
 
 Or run migrations via GitHub Actions (Push Supabase Migrations workflow) or locally: `supabase db push --db-url "$SUPABASE_DATABASE_URL" --yes`. Migrations use unique timestamps (e.g. `20240319120001_add_onboarding_notes_reminders.sql`).
 
+**Manual fix (if profiles recursion or chat_sessions 404):** Run `supabase/migrations/20240319120020_fix_profiles_recursion_and_chat.sql` in Supabase SQL Editor. Fixes: infinite recursion in profiles RLS, creates chat_sessions + chat_messages.
+
 ## AI Gateway Startup
 
 ```bash
