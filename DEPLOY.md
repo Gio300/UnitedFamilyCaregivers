@@ -43,7 +43,7 @@ CREATE POLICY "Users manage own call_notes" ON public.call_notes FOR ALL USING (
 CREATE POLICY "Users manage own reminders" ON public.reminders FOR ALL USING (auth.uid() = user_id);
 ```
 
-Or run the migration file: `supabase/migrations/001_add_onboarding_notes_reminders.sql`
+Or run migrations via GitHub Actions (Push Supabase Migrations workflow) or locally: `supabase db push --db-url "$SUPABASE_DATABASE_URL" --yes`. Migrations use unique timestamps (e.g. `20240319120001_add_onboarding_notes_reminders.sql`).
 
 ## AI Gateway Startup
 
@@ -108,6 +108,12 @@ For **api.kloudykare.com**: The root Kloudy Caddyfile routes `/api/*` to 7501. E
 ## Chat with Tools
 
 Use `?tools=1` for tool-calling (non-streaming): `POST /api/chat?tools=1`
+
+## Deployment Fixes (March 2025)
+
+- **Migration duplicate-key fix:** All migrations renamed to unique timestamps (e.g. `20240319120001_...`). Removed redundant `001_add_onboarding_only_schema_full.sql`. The workflow runs a one-time repair to revert legacy `001` from remote history before pushing.
+- **Login "placeholder.supabase.co":** Build now validates `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` before build. If missing, deploy fails with a clear error. Ensure both secrets are set in Settings > Secrets and variables > Actions.
+- **Required GitHub Secrets:** `NEXT_PUBLIC_SUPABASE_URL` (https://YOUR_PROJECT.supabase.co), `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_DATABASE_URL` (for migrations; use Session pooler from Supabase Dashboard).
 
 ## Troubleshooting AI
 

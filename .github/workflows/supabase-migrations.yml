@@ -29,7 +29,13 @@ jobs:
             exit 1
           fi
 
+      - name: Repair legacy migration 001 (one-time cleanup if duplicate-key occurred)
+        env:
+          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: supabase migration repair 001 --status reverted --db-url "$SUPABASE_DATABASE_URL" || true
+        continue-on-error: true
+
       - name: Push migrations
         env:
           SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
-        run: supabase db push --db-url "$SUPABASE_DATABASE_URL"
+        run: supabase db push --db-url "$SUPABASE_DATABASE_URL" --yes
