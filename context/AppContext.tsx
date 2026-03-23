@@ -116,9 +116,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updated_at: new Date().toISOString(),
       }, { onConflict: "id" }).then(() => {
         supabase.from("chat_messages").delete().eq("session_id", session.id).then(() => {
-          const inserts = session.messages
-            .filter((m) => m.role !== "system")
-            .map((m, i) => ({
+          const inserts = session.messages.map((m, i) => ({
               session_id: session.id,
               user_id: user.id,
               role: m.role,
@@ -157,9 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       supabase.from("chat_sessions").update(payload).eq("id", id).eq("user_id", user.id).then();
       if (updates.messages !== undefined) {
         supabase.from("chat_messages").delete().eq("session_id", id).then(() => {
-          const inserts = updates.messages!
-            .filter((m) => m.role !== "system")
-            .map((m, i) => ({
+          const inserts = updates.messages!.map((m, i) => ({
               session_id: id,
               user_id: user.id,
               role: m.role,

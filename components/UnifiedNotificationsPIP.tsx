@@ -21,15 +21,20 @@ export function UnifiedNotificationsPIP({ onClose }: { onClose: () => void }) {
   const supabase = createClient();
 
   useEffect(() => {
-    void Promise.resolve(
-      supabase
-        .from("profiles")
-        .select("id, full_name, role")
-        .in("role", ["csr_admin", "management_admin"])
-        .is("approved_at", null)
-    )
-      .then(({ data, error }) => setUsers(error ? [] : (data || [])))
-      .finally(() => setLoading(false));
+    let mounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, full_name, role")
+          .in("role", ["csr_admin", "management_admin"])
+          .is("approved_at", null);
+        if (mounted) setUsers(error ? [] : (data || []));
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [supabase]);
 
   const handleApprove = async (userId: string) => {
