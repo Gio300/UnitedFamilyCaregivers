@@ -28,9 +28,9 @@ create table if not exists public.reminders (
 alter table public.call_notes enable row level security;
 alter table public.reminders enable row level security;
 
--- RLS: users see/insert/update own call_notes
-create policy "Users manage own call_notes" on public.call_notes
-  for all using (auth.uid() = user_id);
+-- RLS: call_notes (idempotent - safe to re-run)
+DROP POLICY IF EXISTS "Users manage own call_notes" ON public.call_notes;
+CREATE POLICY "Users manage own call_notes" ON public.call_notes FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- RLS: reminders - only create user_id policy when table has that column
 -- (schema_full uses target_user_id/creator_id and has reminders_all)
