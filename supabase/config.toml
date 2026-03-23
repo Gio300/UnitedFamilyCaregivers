@@ -1,5 +1,6 @@
 # UnitedFamilyCaregivers - Supabase CLI config
 # Used by GitHub Actions for db push (migrations)
+# Trigger workflows after adding SUPABASE_DATABASE_URL secret
 project_id = "UnitedFamilyCaregivers"
 
 [api]
