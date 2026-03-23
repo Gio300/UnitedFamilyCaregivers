@@ -32,6 +32,12 @@ alter table public.reminders enable row level security;
 create policy "Users manage own call_notes" on public.call_notes
   for all using (auth.uid() = user_id);
 
--- RLS: users see/insert/update own reminders
-create policy "Users manage own reminders" on public.reminders
-  for all using (auth.uid() = user_id);
+-- RLS: reminders - only create user_id policy when table has that column
+-- (schema_full uses target_user_id/creator_id and has reminders_all)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='reminders' AND column_name='user_id') THEN
+    DROP POLICY IF EXISTS "Users manage own reminders" ON public.reminders;
+    CREATE POLICY "Users manage own reminders" ON public.reminders FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
