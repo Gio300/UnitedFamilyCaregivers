@@ -144,11 +144,26 @@ The auth callback page sets the session and redirects to `/login` after verifica
 
 ## Full Schema + Test Data
 
-For Message Center (bell icon), profiles, and AI Reply to work:
+For Message Center (bell icon), profiles, AI Reply, and Notes to work:
 
-1. **Supabase SQL Editor** – run in order:
-   - `supabase/schema_full.sql` (or migrations 001–016)
+1. **Supabase SQL Editor** – run migrations in order:
+   - `20240319120006_fix_profiles_rls_recursion.sql` — profiles RLS for admins
+   - `20240319120010_notification_views_user_scoped.sql` — fixes Message Center 500s (unread count)
+   - `20240319120015_chat_sessions.sql` — chat_sessions table
+   - `20240319120016_activity_session_link.sql` — session_id on activity_log, call_notes (for "This chat" notes scope)
+   - `20240319120017_seed_message_center.sql` — Message Center seed
+
+   Or run `supabase/schema_full.sql` then migrations 006–017. Then seeds:
    - `supabase/seed_test_minimal.sql` (test profiles)
-   - `supabase/seed_message_center.sql` (test messages for Message Center)
+   - `supabase/seed_message_center.sql` (if not in migrations)
 
 2. **notification_views** – migration `20240319120010_notification_views_user_scoped.sql` creates the user-scoped table (required for unread count).
+
+## Context Indicators (Admin)
+
+When admins (CSR/admin) select a profile from the Options > Profiles panel:
+
+- **Chat banner** — "Viewing: [Client Name]" appears at the top of the chat with a Clear button.
+- **Right panel** — Shows "Viewing: [Client Name]" or "No profile selected" in the Options view.
+- **AI context** — The AI receives `activeClientName` and `mode` and may mention whose profile is being discussed.
+- **Notes** — The Notes bar (AutoNotesBar) shows activities for the active client; "This chat" scope filters by the current chat session.

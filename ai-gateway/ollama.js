@@ -32,13 +32,18 @@ const ROLE_PROMPTS = {
 function buildSystemPrompt(userContext) {
   let extra = "";
   const role = userContext?.role;
+  const mode = userContext?.mode;
   if (role && ROLE_PROMPTS[role]) {
     extra += `\n\nUser role: ${role}. ${ROLE_PROMPTS[role]}`;
-  } else if (userContext?.mode && MODE_PROMPTS[userContext.mode]) {
-    extra += `\n\nCurrent mode: ${userContext.mode}. ${MODE_PROMPTS[userContext.mode]}`;
+  }
+  if (mode && MODE_PROMPTS[mode]) {
+    extra += `\n\nCurrent mode: ${mode}. ${MODE_PROMPTS[mode]}`;
   }
   if (userContext?.activeClientId) {
     extra += `\n\nActive client ID: ${userContext.activeClientId}`;
+  }
+  if (userContext?.activeClientName) {
+    extra += `\n\nActive client name: ${userContext.activeClientName}. When replying, you may mention you're helping with ${userContext.activeClientName}'s profile when relevant.`;
   }
   if (userContext && Object.keys(userContext).length > 0) {
     extra += `\n\nUser context: ${JSON.stringify(userContext)}`;

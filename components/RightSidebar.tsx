@@ -1,15 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { useApp, type AppMode } from "@/context/AppContext";
 import { ModeBar, MODE_DESCRIPTIONS } from "@/components/ModeBar";
 import { ProfilesPanel } from "@/components/ProfilesPanel";
 
 type SidebarView = "options" | "profiles";
 
+const MODE_QUICK_TIPS: Record<AppMode, string> = {
+  chat: "Ask about UFC, eligibility, or documents.",
+  notes: "Use Notes bar: This chat vs All notes.",
+  messenger: "Use @users and #dm, #email, #reminder.",
+  evv: "Log visits and check-in/out.",
+  customer_service: "Ask about clients, run eligibility, upload docs.",
+  appointments: "Schedule via chat: e.g. \"Tomorrow at 2pm\".",
+  supervisor: "Use bell for pending approvals.",
+  eligibility: "Check eligibility: @Name with DOB + ID or SSN.",
+};
+
 export function RightSidebar() {
-  const { rightSidebarOpen, setRightSidebarOpen, mode, setMode, setPendingAssistantMessage } = useApp();
+  const { rightSidebarOpen, setRightSidebarOpen, mode, setMode, setPendingAssistantMessage, activeClientId, setActiveClientId, userRole } = useApp();
   const [view, setView] = useState<SidebarView>("options");
+  const [activeClientName, setActiveClientName] = useState<string | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (!activeClientId) {
+      setActiveClientName(null);
+      return;
+    }
+    setActiveClientName(null);
+    supabase
+      .from("client_profiles")
+      .select("full_name")
+      .eq("id", activeClientId)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data?.full_name) {
+          setActiveClientName(data.full_name);
+        } else {
+          supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", activeClientId)
+            .single()
+            .then(({ data: p }) => setActiveClientName(p?.full_name ?? null));
+        }
+      });
+  }, [activeClientId, supabase]);
+
+  const isAdmin = userRole === "csr_admin" || userRole === "management_admin";
 
   if (!rightSidebarOpen) return null;
 
@@ -40,12 +81,31 @@ export function RightSidebar() {
       <div className="flex-1 overflow-y-auto p-3">
         {view === "options" ? (
           <>
+            {isAdmin && (
+              <div className="mb-3 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800/80 text-xs">
+                {activeClientId ? (
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-slate-600 dark:text-slate-400 truncate">
+                      Viewing: <strong className="text-slate-900 dark:text-slate-100">{activeClientName ?? "…"}</strong>
+                    </span>
+                    <button type="button" onClick={() => setActiveClientId(null)} className="shrink-0 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:underline">
+                      Clear
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-slate-500 dark:text-slate-400">No profile selected</span>
+                )}
+              </div>
+            )}
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
               Select an option to enable that mode. The chat can do all of these — use this as a visual guide.
             </p>
             <ModeBar vertical onSelect={handleOptionSelect} />
             <p className="text-xs text-slate-500 dark:text-slate-400 pt-3 mt-3 border-t border-slate-200 dark:border-zinc-700">
               Current: {mode.replace("_", " ")}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1" title={MODE_DESCRIPTIONS[mode]}>
+              {MODE_QUICK_TIPS[mode]}
             </p>
             <button
               type="button"

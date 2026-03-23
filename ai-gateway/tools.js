@@ -257,6 +257,7 @@ const TOOL_DEFINITIONS = [
 
 async function executeTool(name, args, supabase, userId, userContext = {}) {
   const activeClientId = userContext?.activeClientId;
+  const sessionId = userContext?.session_id || null;
   switch (name) {
     case "get_profile": {
       const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
@@ -278,12 +279,31 @@ async function executeTool(name, args, supabase, userId, userContext = {}) {
     case "create_note": {
       const { call_reason, disposition, notes, client_id } = args || {};
       const clientId = client_id || activeClientId || null;
+      const insertPayload = {
+        user_id: userId,
+        client_id: clientId,
+        call_reason: call_reason || null,
+        disposition: disposition || null,
+        notes: notes || "",
+        ...(sessionId && { session_id: sessionId }),
+      };
       const { data, error } = await supabase
         .from("call_notes")
-        .insert({ user_id: userId, client_id: clientId, call_reason: call_reason || null, disposition: disposition || null, notes: notes || "" })
+        .insert(insertPayload)
         .select()
         .single();
       if (error) return JSON.stringify({ error: error.message });
+      const noteId = data?.id;
+      if (noteId && (userId || clientId)) {
+        const actPayload = {
+          user_id: userId,
+          client_id: clientId,
+          action_type: "note_created",
+          details: { note_id: noteId },
+          ...(sessionId && { session_id: sessionId }),
+        };
+        await supabase.from("activity_log").insert(actPayload);
+      }
       return JSON.stringify(data || { created: true });
     }
     case "add_reminder": {
@@ -346,6 +366,17 @@ async function executeTool(name, args, supabase, userId, userContext = {}) {
         .select()
         .single();
       if (error) return JSON.stringify({ error: error.message });
+      const encounterId = data?.id;
+      if (encounterId) {
+        const actPayload = {
+          user_id: userId,
+          client_id,
+          action_type: "encounter_created",
+          details: { encounter_id: encounterId },
+          ...(sessionId && { session_id: sessionId }),
+        };
+        await supabase.from("activity_log").insert(actPayload);
+      }
       return JSON.stringify(data || { created: true });
     }
     case "list_encounters": {

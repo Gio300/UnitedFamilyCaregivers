@@ -13,7 +13,8 @@ interface Message {
 }
 
 export function ChatPanel() {
-  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, updateChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments, activeClientId, pendingAssistantMessage, setPendingAssistantMessage } = useApp();
+  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, updateChatSession, loadChatSession, currentSessionId, openChatSession, pendingAttachments, setPendingAttachments, activeClientId, setActiveClientId, mode, pendingAssistantMessage, setPendingAssistantMessage } = useApp();
+  const [activeClientName, setActiveClientName] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
@@ -39,6 +40,31 @@ export function ChatPanel() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id ?? null));
   }, [supabase]);
+
+  useEffect(() => {
+    if (!activeClientId) {
+      setActiveClientName(null);
+      return;
+    }
+    setActiveClientName(null);
+    supabase
+      .from("client_profiles")
+      .select("full_name")
+      .eq("id", activeClientId)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data?.full_name) {
+          setActiveClientName(data.full_name);
+        } else {
+          supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", activeClientId)
+            .single()
+            .then(({ data: p }) => setActiveClientName(p?.full_name ?? null));
+        }
+      });
+  }, [activeClientId, supabase]);
 
   const HASH_ACTIONS = [
     { id: "dm", label: "DM", icon: "💬" },
@@ -168,13 +194,32 @@ export function ChatPanel() {
         return;
       }
 
+      let effectiveSessionId = currentSessionId;
+      if (!effectiveSessionId) {
+        const sessionId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        addChatSession({
+          id: sessionId,
+          messages: [...messages, userMsg],
+          preview: userMsg.content?.slice(0, 60) || "New chat",
+          createdAt: Date.now(),
+        });
+        openChatSession(sessionId);
+        effectiveSessionId = sessionId;
+      }
+
       const history = messages.map(({ role, content }) => ({ role, content }));
       const useTools = userRole === "csr_admin" || userRole === "management_admin";
       const body = JSON.stringify({
         message: userMsg.content,
         history,
         attachments: userMsg.attachments,
-        userContext: { role: userRole || undefined, activeClientId: activeClientId || undefined },
+        userContext: {
+          role: userRole || undefined,
+          activeClientId: activeClientId || undefined,
+          activeClientName: activeClientName || undefined,
+          mode: mode || undefined,
+          session_id: effectiveSessionId || undefined,
+        },
       });
       const fetchOpts = {
         method: "POST" as const,
@@ -258,8 +303,24 @@ export function ChatPanel() {
     }
   }
 
+  const isAdmin = userRole === "csr_admin" || userRole === "management_admin";
+
   return (
     <div className="flex flex-col flex-1 min-h-0 border border-slate-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-black shadow-sm">
+      {isAdmin && activeClientId && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900/50 text-sm">
+          <span className="text-slate-600 dark:text-slate-400">
+            Viewing: <strong className="text-slate-900 dark:text-slate-100">{activeClientName ?? "Loading..."}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => setActiveClientId(null)}
+            className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:underline"
+          >
+            Clear
+          </button>
+        </div>
+      )}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-scroll p-4 space-y-3 relative">
         {messages.length === 0 && (
           <p className="text-sm text-zinc-500">Send a message to start chatting.</p>
