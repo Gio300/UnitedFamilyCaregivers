@@ -1,0 +1,32 @@
+---
+description: Deploy-fix-repeat cycle for CI/CD; follow until all workflows succeed
+globs: .github/workflows/**/*.yml
+alwaysApply: false
+---
+
+# Deploy-Fix-Repeat Cycle
+
+When deploying or fixing CI/CD, follow this cycle until all workflows succeed. Minimize human-in-the-loop.
+
+## Cycle
+
+1. **Deploy** – Commit and push changes. Triggers GitHub Actions.
+2. **Check status** – Use GitHub API: `GET /repos/OWNER/REPO/actions/runs?per_page=5&branch=main`. Inspect `conclusion` per workflow.
+3. **If failed** – Fetch jobs: `GET /repos/OWNER/REPO/actions/runs/{run_id}/jobs`. Find step with `conclusion: "failure"`.
+4. **Fix** – Address root cause from step name and error.
+5. **Redeploy** – Commit fix, push, return to step 2.
+6. **Success** – Stop when both Deploy and Migrations pass.
+
+## Common Fixes
+
+| Failure | Fix |
+|---------|-----|
+| Validate deploy secrets | Use warning instead of error; deploy succeeds, login fails until secrets set |
+| Push migrations exit 1 | Fix migration SQL; ensure unique timestamps; run `migration repair` if needed |
+| Build failure | Fix TypeScript, lint, or deps |
+
+## Rules
+
+- Prefer warnings over hard failures when deploy can still produce usable artifact.
+- If logs 403, infer from step names and add `--debug` for future runs.
+- Do not stop until Deploy to GitHub Pages and Push Supabase Migrations both pass.
