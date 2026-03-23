@@ -13,7 +13,7 @@ interface Message {
 }
 
 export function ChatPanel() {
-  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, updateChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments, activeClientId } = useApp();
+  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, updateChatSession, loadChatSession, currentSessionId, pendingAttachments, setPendingAttachments, activeClientId, pendingAssistantMessage, setPendingAssistantMessage } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
@@ -92,6 +92,13 @@ export function ChatPanel() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (pendingAssistantMessage) {
+      setMessages((m) => [...m, { role: "assistant", content: pendingAssistantMessage }]);
+      setPendingAssistantMessage(null);
+    }
+  }, [pendingAssistantMessage, setPendingAssistantMessage]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {

@@ -64,6 +64,8 @@ interface AppContextValue {
   setPendingAttachments: (files: { name: string; url: string }[]) => void;
   autoNotesScope: "this_chat" | "all";
   setAutoNotesScope: (scope: "this_chat" | "all") => void;
+  pendingAssistantMessage: string | null;
+  setPendingAssistantMessage: (msg: string | null) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -91,6 +93,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string }[]>([]);
   const [autoNotesScope, setAutoNotesScopeState] = useState<"this_chat" | "all">("all");
+  const [pendingAssistantMessage, setPendingAssistantMessage] = useState<string | null>(null);
 
   const openChatSession = useCallback((id: string) => {
     setCurrentSessionIdState(id);
@@ -431,6 +434,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setPendingAttachments,
         autoNotesScope,
         setAutoNotesScope: setAutoNotesScopeState,
+        pendingAssistantMessage,
+        setPendingAssistantMessage,
       }}
     >
       {children}

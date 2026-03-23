@@ -118,8 +118,8 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
           type="button"
           onClick={() => setRightSidebarOpen(true)}
           className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
-          title="Profiles"
-          aria-label="Profiles"
+          title="Options"
+          aria-label="Options"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
