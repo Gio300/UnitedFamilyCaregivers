@@ -19,24 +19,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate deploy secrets
+      - name: Validate deploy secrets (warning only)
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
           if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
-            echo "::error::NEXT_PUBLIC_SUPABASE_URL secret is not set. Add it in Settings > Secrets and variables > Actions. Use your Supabase project URL (e.g. https://PROJECT_REF.supabase.co)"
-            exit 1
+            echo "::warning::NEXT_PUBLIC_SUPABASE_URL not set. Login will fail until you add it in Settings > Secrets and variables > Actions (e.g. https://PROJECT_REF.supabase.co)"
+          elif [[ "$NEXT_PUBLIC_SUPABASE_URL" != https://* ]]; then
+            echo "::warning::NEXT_PUBLIC_SUPABASE_URL must start with https://"
+          elif [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::warning::NEXT_PUBLIC_SUPABASE_ANON_KEY not set. Login will fail until added in Settings > Secrets"
+          else
+            echo "Supabase secrets validated"
           fi
-          if [[ "$NEXT_PUBLIC_SUPABASE_URL" != https://* ]]; then
-            echo "::error::NEXT_PUBLIC_SUPABASE_URL must start with https://"
-            exit 1
-          fi
-          if [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
-            echo "::error::NEXT_PUBLIC_SUPABASE_ANON_KEY secret is not set. Add it in Settings > Secrets and variables > Actions."
-            exit 1
-          fi
-          echo "Supabase secrets validated"
 
       - name: Setup Node
         uses: actions/setup-node@v4

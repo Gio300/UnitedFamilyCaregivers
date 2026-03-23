@@ -38,4 +38,4 @@ jobs:
       - name: Push migrations
         env:
           SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
-        run: supabase db push --db-url "$SUPABASE_DATABASE_URL" --yes
+        run: supabase db push --db-url "$SUPABASE_DATABASE_URL" --yes --debug
