@@ -23,8 +23,11 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase.from("profiles").select("full_name, role, approved_at").eq("id", user.id).single().then(({ data, error }) => {
+      if (!user) return;
+      void Promise.resolve(
+        supabase.from("profiles").select("full_name, role, approved_at").eq("id", user.id).single()
+      )
+        .then(({ data, error }) => {
           if (error) {
             setUserName(user.email?.split("@")[0] || "User");
             setIsSupervisor(false);
@@ -33,22 +36,24 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
           setUserName(data?.full_name || user.email?.split("@")[0] || "User");
           const approved = !!data?.approved_at;
           setIsSupervisor((data?.role === "management_admin" || data?.role === "csr_admin") && approved);
-        }).catch(() => {
+        })
+        .catch(() => {
           setUserName(user.email?.split("@")[0] || "User");
           setIsSupervisor(false);
         });
-      }
     });
   }, [supabase]);
 
   useEffect(() => {
     if (!isSupervisor) return;
-    supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .in("role", ["csr_admin", "management_admin"])
-      .is("approved_at", null)
-      .then(({ count, error }) => { setPendingCount(error ? 0 : (count ?? 0)); })
+    void Promise.resolve(
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .in("role", ["csr_admin", "management_admin"])
+        .is("approved_at", null)
+    )
+      .then(({ count, error }) => setPendingCount(error ? 0 : (count ?? 0)))
       .catch(() => setPendingCount(0));
   }, [isSupervisor, supabase]);
 
