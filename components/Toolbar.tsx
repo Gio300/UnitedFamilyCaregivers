@@ -204,13 +204,6 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
                 >
                   Profile
                 </Link>
-                <Link
-                  href="/dashboard/profiles"
-                  className="block px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-700 hover:text-slate-900 dark:hover:text-white"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Profiles
-                </Link>
                 <button
                   type="button"
                   onClick={() => { setMenuOpen(false); handleLogout(); }}

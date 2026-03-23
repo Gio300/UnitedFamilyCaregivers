@@ -1,11 +1,15 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { useApp, type AppMode } from "@/context/AppContext";
 import { ModeBar, MODE_DESCRIPTIONS } from "@/components/ModeBar";
+import { ProfilesPanel } from "@/components/ProfilesPanel";
+
+type SidebarView = "options" | "profiles";
 
 export function RightSidebar() {
   const { rightSidebarOpen, setRightSidebarOpen, mode, setMode, setPendingAssistantMessage } = useApp();
+  const [view, setView] = useState<SidebarView>("options");
 
   if (!rightSidebarOpen) return null;
 
@@ -18,7 +22,9 @@ export function RightSidebar() {
     <aside className="w-72 shrink-0 border-l border-slate-200 dark:border-zinc-700/50 bg-white dark:bg-zinc-900/95 flex flex-col">
       <div className="p-3 border-b border-slate-200 dark:border-zinc-700/50 shrink-0">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Options Menu</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            {view === "options" ? "Options Menu" : "Profiles"}
+          </h3>
           <button
             type="button"
             onClick={() => setRightSidebarOpen(false)}
@@ -32,19 +38,35 @@ export function RightSidebar() {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-3">
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-          Select an option to enable that mode. The chat can do all of these — use this as a visual guide.
-        </p>
-        <ModeBar vertical onSelect={handleOptionSelect} />
-        <p className="text-xs text-slate-500 dark:text-slate-400 pt-3 mt-3 border-t border-slate-200 dark:border-zinc-700">
-          Current: {mode.replace("_", " ")}
-        </p>
-        <Link
-          href="/dashboard/profiles"
-          className="mt-3 block w-full py-2 px-3 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-center"
-        >
-          Profiles
-        </Link>
+        {view === "options" ? (
+          <>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Select an option to enable that mode. The chat can do all of these — use this as a visual guide.
+            </p>
+            <ModeBar vertical onSelect={handleOptionSelect} />
+            <p className="text-xs text-slate-500 dark:text-slate-400 pt-3 mt-3 border-t border-slate-200 dark:border-zinc-700">
+              Current: {mode.replace("_", " ")}
+            </p>
+            <button
+              type="button"
+              onClick={() => setView("profiles")}
+              className="mt-3 block w-full py-2 px-3 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-center"
+            >
+              Profiles
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setView("options")}
+              className="mb-3 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            >
+              ← Back to Options
+            </button>
+            <ProfilesPanel />
+          </>
+        )}
       </div>
     </aside>
   );

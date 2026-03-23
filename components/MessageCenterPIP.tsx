@@ -20,6 +20,7 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [aiReplyLoading, setAiReplyLoading] = useState(false);
   const [aiReplyResult, setAiReplyResult] = useState<{ needs_human?: boolean; sent?: boolean; response?: string; error?: string } | null>(null);
+  const [fetchError, setFetchError] = useState(false);
   const supabase = createClient();
 
   const itemKey = (item: MessageCenterItem) => `${item.type}-${item.id}`;
@@ -30,6 +31,7 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
   };
 
   const fetchItems = useCallback(async () => {
+    setFetchError(false);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -127,6 +129,9 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
     });
 
     combined.sort((a, b) => new Date(getDate(b)).getTime() - new Date(getDate(a)).getTime());
+
+    const hadErrors = [remindersRes, callNotesRes, incomingRes, sentRes, activityRes, viewsRes].some((r) => r.error != null);
+    if (hadErrors) setFetchError(true);
 
     setItems(combined);
     setLoading(false);
@@ -336,7 +341,14 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
               )}
             </div>
           ) : items.length === 0 ? (
-            <p className="text-sm text-slate-500">No messages yet.</p>
+            <div className="space-y-2">
+              <p className="text-sm text-slate-500">No messages yet.</p>
+              {fetchError && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Some tables returned errors. Run schema_full.sql and migrations in Supabase SQL Editor, then seed_message_center.sql for test data.
+                </p>
+              )}
+            </div>
           ) : (
             <ul className="space-y-1">
               {items.map((item) => {
