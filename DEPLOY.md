@@ -76,7 +76,7 @@ Caddy listens on 8080 and proxies `/api/*` to AI Gateway (7501).
 For production, deploy the API on a VPS with Caddy + direct DNS (mirrors KloudyKare):
 
 1. See [UFC_VPS_DEPLOY.md](UFC_VPS_DEPLOY.md) for full instructions
-2. Run `docker compose up -d` from the `docker/` folder
+2. Run `docker compose up -d` from the `docker/` folder. After code changes, rebuild: `docker compose build --no-cache ai-gateway && docker compose up -d`
 3. Set `NEXT_PUBLIC_API_BASE=https://api.unitedfamilycaregivers.com` in GitHub Secrets
 
 ## Cloudflare Tunnel
