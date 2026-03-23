@@ -142,7 +142,9 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
         { n: "activity_log", e: activityRes.error },
         { n: "notification_views", e: viewsRes.error },
       ].filter((x) => x.e).map((x) => `${x.n}:${x.e?.message || ""}`);
-      fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'MessageCenterPIP.tsx:fetchItems',message:'Message Center table errors',data:{errors:errs},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+      // #region agent log
+      fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'MessageCenterPIP.tsx:fetchItems',message:'Message Center table errors',data:{errors:errs,activityLogFull:activityRes.error?{message:activityRes.error.message,code:activityRes.error.code,details:activityRes.error.details}:null},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setFetchError(true);
     }
 

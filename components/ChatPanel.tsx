@@ -190,6 +190,9 @@ export function ChatPanel() {
       }
 
       const apiBase = getApiBase();
+      // #region agent log
+      fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'ChatPanel.tsx:sendMessage',message:'API base before fetch',data:{apiBase:apiBase||'(empty)',hasApiBase:!!apiBase},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (!apiBase) {
         setMessages((m) => [...m, { role: "assistant", content: "API base URL not configured. Set NEXT_PUBLIC_API_BASE in GitHub Secrets or .env.local." }]);
         return;
@@ -326,6 +329,9 @@ export function ChatPanel() {
       const errMsg = err instanceof Error ? err.message : "Unknown error";
       const isAbort = errMsg.includes("aborted") || errMsg.includes("timeout");
       const isFailedFetch = errMsg.includes("fetch") || errMsg.includes("Failed to fetch");
+      // #region agent log
+      fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'ChatPanel.tsx:catch',message:'Chat fetch error',data:{errMsg,isFailedFetch,isAbort,apiBase:getApiBase()||'(empty)'},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       let mcpFallback: string | null = null;
       try {
         const { data: { session } } = await supabase.auth.getSession();

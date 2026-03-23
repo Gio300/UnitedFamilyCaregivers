@@ -330,6 +330,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .order("updated_at", { ascending: false })
         .limit(50)
         .then(({ data: sessions, error: se }) => {
+          // #region agent log
+          fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'AppContext.tsx:chat_sessions',message:'chat_sessions query result',data:{error:se?.message,code:se?.code,details:se?.details,sessionCount:sessions?.length??0},hypothesisId:'H3',timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           if (se || !sessions?.length) return;
           supabase
             .from("chat_messages")
@@ -337,6 +340,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             .in("session_id", sessions.map((s) => s.id))
             .order("created_at", { ascending: true })
             .then(({ data: msgs, error: me }) => {
+              // #region agent log
+              fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'AppContext.tsx:chat_messages',message:'chat_messages query result',data:{error:me?.message,code:me?.code,details:me?.details,hint:me?.hint,msgCount:msgs?.length??0,sessionIds:sessions?.slice(0,3).map(s=>s.id)},hypothesisId:'H4',timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
               if (me) return;
               const bySession = new Map<string, { role: "user" | "assistant"; content: string; attachments?: { name: string; url: string }[] }[]>();
               (msgs || []).forEach((m) => {

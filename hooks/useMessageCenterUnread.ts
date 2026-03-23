@@ -76,6 +76,9 @@ export function useMessageCenterUnread() {
     }
     try {
       const { data, error } = await supabase.from("activity_log").select("id").eq("user_id", user.id).limit(100);
+      // #region agent log
+      if (error) fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'useMessageCenterUnread.ts:activity_log',message:'activity_log query failed',data:{error:error.message,code:error.code,details:error.details},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (!error) add("activity", data || []);
     } catch {
       /* ignore */
