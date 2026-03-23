@@ -128,3 +128,27 @@ Use `?tools=1` for tool-calling (non-streaming): `POST /api/chat?tools=1`
 | api.kloudykare.com returns wrong service | Tunnel may point to wrong port. Config: `service: http://localhost:7501` (direct) or `http://localhost:8080` (via Caddy). |
 
 **Verify locally:** `curl http://localhost:7501/api/health` → `{"status":"ok","service":"ufc-ai-gateway"}`
+
+## Supabase Auth Redirect (Email Verification)
+
+When users click the verify-email link from Supabase, they must land on the UFCi app.
+
+1. **Supabase Dashboard** → Authentication → URL Configuration
+2. **Site URL:** `https://gio300.github.io/UnitedFamilyCaregivers`
+3. **Redirect URLs** – add:
+   - `https://gio300.github.io/UnitedFamilyCaregivers/auth/callback`
+   - `https://gio300.github.io/UnitedFamilyCaregivers/login`
+   - For local dev: `http://localhost:3000/auth/callback`, `http://localhost:3000/login`
+
+The auth callback page sets the session and redirects to `/login` after verification.
+
+## Full Schema + Test Data
+
+For Message Center (bell icon), profiles, and AI Reply to work:
+
+1. **Supabase SQL Editor** – run in order:
+   - `supabase/schema_full.sql` (or migrations 001–016)
+   - `supabase/seed_test_minimal.sql` (test profiles)
+   - `supabase/seed_message_center.sql` (test messages for Message Center)
+
+2. **notification_views** – migration `20240319120010_notification_views_user_scoped.sql` creates the user-scoped table (required for unread count).

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useApp, type AppMode } from "@/context/AppContext";
 import { ModeBar, MODE_DESCRIPTIONS } from "@/components/ModeBar";
 
@@ -38,6 +39,12 @@ export function RightSidebar() {
         <p className="text-xs text-slate-500 dark:text-slate-400 pt-3 mt-3 border-t border-slate-200 dark:border-zinc-700">
           Current: {mode.replace("_", " ")}
         </p>
+        <Link
+          href="/dashboard/profiles"
+          className="mt-3 block w-full py-2 px-3 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-center"
+        >
+          Profiles
+        </Link>
       </div>
     </aside>
   );

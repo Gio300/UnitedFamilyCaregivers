@@ -50,6 +50,12 @@ export function ProfilesPanel() {
         return;
       }
 
+      // Check if current user is admin (for search + Create profile UI)
+      const { data: myProfile } = await supabase.from("profiles").select("role, approved_at").eq("id", user.id).single();
+      setIsAdmin(
+        (myProfile?.role === "csr_admin" || myProfile?.role === "management_admin") && !!myProfile?.approved_at
+      );
+
       // Try real profiles first
       let { data: profs } = await supabase
         .from("profiles")

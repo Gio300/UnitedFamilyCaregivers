@@ -264,6 +264,91 @@ app.post("/api/activity/auto-note", requireAuth, async (req, res) => {
   }
 });
 
+app.post("/api/notifications/auto-respond", requireAuth, async (req, res) => {
+  try {
+    const { item_type, item_id } = req.body;
+    if (!item_type || !item_id) {
+      return res.status(400).json({ error: "item_type and item_id required" });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: req.headers.authorization ? { Authorization: req.headers.authorization } : {} },
+    });
+
+    const { data: existing } = await supabase
+      .from("message_auto_responses")
+      .select("needs_human, ai_response, sent_at")
+      .eq("item_type", item_type)
+      .eq("item_id", item_id)
+      .single();
+
+    if (existing) {
+      return res.json({
+        needs_human: !!existing.needs_human,
+        sent: !!existing.sent_at,
+        response: existing.ai_response,
+      });
+    }
+
+    let messageContent = "";
+    let customerName = "";
+
+    if (item_type === "incoming_email") {
+      const { data: row, error } = await supabase
+        .from("incoming_emails")
+        .select("body, subject, from_email")
+        .eq("id", item_id)
+        .single();
+      if (!error && row) {
+        messageContent = (row.body || row.subject || "").trim();
+        customerName = row.from_email || "";
+      }
+    } else if (item_type === "sent_message") {
+      const { data: row, error } = await supabase
+        .from("sent_messages")
+        .select("body, subject, recipient_email")
+        .eq("id", item_id)
+        .single();
+      if (!error && row) {
+        messageContent = (row.body || row.subject || "").trim();
+        customerName = row.recipient_email || "";
+      }
+    } else if (item_type === "call_note") {
+      const { data: row, error } = await supabase
+        .from("call_notes")
+        .select("notes, call_reason")
+        .eq("id", item_id)
+        .single();
+      if (!error && row) {
+        messageContent = (row.notes || row.call_reason || "").trim();
+      }
+    }
+
+    if (!messageContent) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    const result = await ollama.generateAutoResponse(messageContent, item_type, customerName);
+
+    await supabase.from("message_auto_responses").upsert(
+      {
+        item_type,
+        item_id,
+        ai_response: result.response,
+        needs_human: result.needs_human,
+        sent_at: null,
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: "item_type,item_id" }
+    );
+
+    return res.json({ needs_human: result.needs_human, sent: false, response: result.response });
+  } catch (err) {
+    console.error("Auto-respond error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/notes/extract", requireAuth, async (req, res) => {
   try {
     const { text } = req.body;

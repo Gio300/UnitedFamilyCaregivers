@@ -222,6 +222,44 @@ async function generateWithTools(prompt, history, userContext, tools, executeToo
 
 const AUTO_NOTE_PROMPT = `Summarize these profile activities into a brief call note (2-4 sentences). Describe what was performed and why, in natural language suitable for a call log. Be concise.`;
 
+const AUTO_RESPONSE_PROMPT = `You are an admin assistant for United Family Caregivers (NV Care Solutions Inc.). A patient or customer sent a message. Generate a professional reply.
+
+RULES:
+1. If the message explicitly requests a human, real person, agent, transfer, or to speak to someone (e.g. "I want to talk to a person", "transfer me", "speak to human", "real agent"), return: {"needs_human": true}
+2. If the message is sensitive, urgent, or an edge case requiring human judgment, return: {"needs_human": true}
+3. Otherwise, return: {"needs_human": false, "response": "your reply text here", "suggested_action": "email"}
+4. Keep the response concise and professional.
+5. Return ONLY valid JSON, no other text.`;
+
+async function generateAutoResponse(messageContent, messageType, customerName) {
+  const prompt = `${AUTO_RESPONSE_PROMPT}
+
+Message type: ${messageType}
+${customerName ? `Customer/From: ${customerName}` : ""}
+
+Incoming message:
+---
+${(messageContent || "").slice(0, 2000)}
+---
+
+Return JSON:`;
+  const response = await generate(prompt, []);
+  const jsonMatch = response.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return { needs_human: true, response: "", suggested_action: null };
+  }
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      needs_human: !!parsed.needs_human,
+      response: parsed.response || "",
+      suggested_action: parsed.suggested_action || "email",
+    };
+  } catch (e) {
+    return { needs_human: true, response: "", suggested_action: null };
+  }
+}
+
 async function generateActivitySummary(activities) {
   const text = activities
     .map((a) => `- ${a.action_type}${a.details ? `: ${JSON.stringify(a.details)}` : ""}`)
@@ -231,4 +269,4 @@ async function generateActivitySummary(activities) {
   return response.trim();
 }
 
-module.exports = { generate, generateStream, generateWithTools, extractCallNoteFromText, generateActivitySummary, MODEL_FAST, MODEL_SMART };
+module.exports = { generate, generateStream, generateWithTools, extractCallNoteFromText, generateActivitySummary, generateAutoResponse, MODEL_FAST, MODEL_SMART };

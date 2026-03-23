@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getApiBase } from "@/lib/api";
 
 export type MessageCenterItem =
   | { type: "reminder"; id: string; data: { text: string; remind_at: string; client_id?: string } }
@@ -17,6 +18,8 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
   const [view, setView] = useState<"list" | "detail">("list");
   const [selectedItem, setSelectedItem] = useState<MessageCenterItem | null>(null);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  const [aiReplyLoading, setAiReplyLoading] = useState(false);
+  const [aiReplyResult, setAiReplyResult] = useState<{ needs_human?: boolean; sent?: boolean; response?: string; error?: string } | null>(null);
   const supabase = createClient();
 
   const itemKey = (item: MessageCenterItem) => `${item.type}-${item.id}`;
@@ -147,8 +150,37 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
   const handleSelect = (item: MessageCenterItem) => {
     setSelectedItem(item);
     setView("detail");
+    setAiReplyResult(null);
     markSeen(item);
   };
+
+  const handleAiReply = async () => {
+    if (!selectedItem) return;
+    const apiBase = getApiBase();
+    if (!apiBase) {
+      setAiReplyResult({ needs_human: true, response: "API not configured. Set NEXT_PUBLIC_API_BASE." });
+      return;
+    }
+    setAiReplyLoading(true);
+    setAiReplyResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${apiBase}/api/notifications/auto-respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ item_type: selectedItem.type, item_id: selectedItem.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setAiReplyResult(data);
+      if (!data.error) fetchItems();
+    } catch {
+      setAiReplyResult({ needs_human: true, response: "Request failed" });
+    } finally {
+      setAiReplyLoading(false);
+    }
+  };
+
+  const canAiReply = selectedItem && (selectedItem.type === "incoming_email" || selectedItem.type === "sent_message" || selectedItem.type === "call_note");
 
   const unreadCount = items.filter((i) => !seenIds.has(itemKey(i))).length;
 
@@ -278,6 +310,29 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
                   </p>
                   <p className="text-xs text-slate-500">Scheduled appointment reminder</p>
                 </>
+              )}
+              {canAiReply && (
+                <div className="pt-3 mt-3 border-t border-slate-200 dark:border-zinc-700">
+                  <button
+                    type="button"
+                    onClick={handleAiReply}
+                    disabled={aiReplyLoading}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {aiReplyLoading ? "Processing…" : "AI Reply"}
+                  </button>
+                  {aiReplyResult && (
+                    <div className="mt-2 p-2 rounded bg-slate-100 dark:bg-zinc-800 text-sm">
+                      {aiReplyResult.needs_human ? (
+                        <p className="text-amber-600 dark:text-amber-400 font-medium">Needs human response.</p>
+                      ) : aiReplyResult.response ? (
+                        <p className="text-slate-700 dark:text-slate-300">{aiReplyResult.response}</p>
+                      ) : aiReplyResult.error ? (
+                        <p className="text-red-600 dark:text-red-400">{aiReplyResult.error}</p>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ) : items.length === 0 ? (

@@ -73,6 +73,7 @@ export default function DashboardLayout({
   }
 
   const isProfilePage = pathname === "/dashboard/profile";
+  const isProfilesPage = pathname === "/dashboard/profiles";
   const isPendingApprovalPage = pathname === "/dashboard/pending-approval";
 
   return (
@@ -82,6 +83,10 @@ export default function DashboardLayout({
           <Toolbar onSettingsClick={() => setSettingsOpen(true)} />
           <main className="flex-1 flex min-h-0 overflow-hidden">
             {isProfilePage ? (
+              <div className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 overflow-auto">
+                {children}
+              </div>
+            ) : isProfilesPage ? (
               <div className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 overflow-auto">
                 {children}
               </div>
