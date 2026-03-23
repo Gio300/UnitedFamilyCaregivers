@@ -1,39 +1,39 @@
 -- Migration: Add onboarding_completed, call_notes, reminders
--- Run in Supabase SQL Editor for existing projects
+-- Idempotent: safe for fresh DB or schema_full-based DB
 
--- Add onboarding_completed to profiles (if column doesn't exist)
-alter table public.profiles add column if not exists onboarding_completed boolean default false;
+-- 1. Profile column (always)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS onboarding_completed boolean DEFAULT false;
 
--- Call notes (extracted from calls, linked to user/client)
-create table if not exists public.call_notes (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users not null,
-  client_id uuid references auth.users(id),
+-- 2. Call notes: create if missing, policy if table has user_id
+CREATE TABLE IF NOT EXISTS public.call_notes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users NOT NULL,
+  client_id uuid REFERENCES auth.users(id),
   call_reason text,
   disposition text,
   notes text,
-  created_at timestamptz default now()
+  created_at timestamptz DEFAULT now()
 );
+ALTER TABLE public.call_notes ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='call_notes' AND column_name='user_id') THEN
+    DROP POLICY IF EXISTS "Users manage own call_notes" ON public.call_notes;
+    CREATE POLICY "Users manage own call_notes" ON public.call_notes FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
 
--- Reminders for users
-create table if not exists public.reminders (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users not null,
-  title text not null,
+-- 3. Reminders: create if missing, policy only when table has user_id
+-- (schema_full uses target_user_id/creator_id and has reminders_all)
+CREATE TABLE IF NOT EXISTS public.reminders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users NOT NULL,
+  title text NOT NULL,
   due_at timestamptz,
   completed_at timestamptz,
-  created_at timestamptz default now()
+  created_at timestamptz DEFAULT now()
 );
-
-alter table public.call_notes enable row level security;
-alter table public.reminders enable row level security;
-
--- RLS: call_notes (idempotent - safe to re-run)
-DROP POLICY IF EXISTS "Users manage own call_notes" ON public.call_notes;
-CREATE POLICY "Users manage own call_notes" ON public.call_notes FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-
--- RLS: reminders - only create user_id policy when table has that column
--- (schema_full uses target_user_id/creator_id and has reminders_all)
+ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='reminders' AND column_name='user_id') THEN
