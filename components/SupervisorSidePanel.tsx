@@ -33,18 +33,9 @@ export function SupervisorSidePanel() {
 
   useEffect(() => {
     if (!isSupervisor) return;
-    Promise.all([
-      supabase
-        .from("call_notes")
-        .select("id, call_reason, disposition, notes, created_at, user_id")
-        .order("created_at", { ascending: false })
-        .limit(50)
-        .then(({ data }) => setNotes(data || [])),
-      supabase
-        .from("profiles")
-        .select("id, full_name, role, approved_at")
-        .order("full_name")
-        .then(({ data }) => setUsers(data || [])),
+    void Promise.all([
+      Promise.resolve(supabase.from("call_notes").select("id, call_reason, disposition, notes, created_at, user_id").order("created_at", { ascending: false }).limit(50)).then(({ data }) => setNotes(data || [])),
+      Promise.resolve(supabase.from("profiles").select("id, full_name, role, approved_at").order("full_name")).then(({ data }) => setUsers(data || [])),
     ]).finally(() => setLoading(false));
   }, [isSupervisor, supabase]);
 

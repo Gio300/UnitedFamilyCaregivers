@@ -16,11 +16,9 @@ export function SupervisorApprovalPIP({ onClose }: { onClose: () => void }) {
   const supabase = createClient();
 
   useEffect(() => {
-    supabase
-      .from("profiles")
-      .select("id, full_name, role")
-      .in("role", ["csr_admin", "management_admin"])
-      .is("approved_at", null)
+    void Promise.resolve(
+      supabase.from("profiles").select("id, full_name, role").in("role", ["csr_admin", "management_admin"]).is("approved_at", null)
+    )
       .then(({ data }) => setUsers(data || []))
       .then(() => setLoading(false), () => setLoading(false));
   }, [supabase]);

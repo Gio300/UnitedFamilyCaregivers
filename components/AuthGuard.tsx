@@ -16,11 +16,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         router.replace("/login");
         return;
       }
-      void supabase
-        .from("profiles")
-        .select("role, approved_at")
-        .eq("id", session.user.id)
-        .single()
+      void Promise.resolve(
+        supabase.from("profiles").select("role, approved_at").eq("id", session.user.id).single()
+      )
         .then(({ data }) => {
           const role = data?.role;
           const approved = !!data?.approved_at;
