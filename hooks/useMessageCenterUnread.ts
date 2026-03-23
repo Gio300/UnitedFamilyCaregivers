@@ -15,15 +15,20 @@ export function useMessageCenterUnread() {
     }
 
     const seen = new Set<string>();
+    // #region agent log
     try {
       const { data: views, error } = await supabase
         .from("notification_views")
         .select("item_type, item_id")
         .eq("user_id", user.id);
+      if (error) {
+        fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'useMessageCenterUnread.ts:notification_views',message:'notification_views query failed',data:{error:error.message,code:error.code},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
+      }
       if (!error && views) views.forEach((v) => seen.add(`${v.item_type}-${v.item_id}`));
-    } catch {
-      /* table may lack user_id or 500 - treat as empty */
+    } catch (e) {
+      fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'useMessageCenterUnread.ts:notification_views_catch',message:'notification_views exception',data:{err:String(e)},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
     }
+    // #endregion
 
     let total = 0;
     const add = (type: string, data: { id: string }[]) => {

@@ -6,12 +6,11 @@ import { useApp, type AppMode } from "@/context/AppContext";
 import { ModeBar, MODE_DESCRIPTIONS } from "@/components/ModeBar";
 import { ProfilesPanel } from "@/components/ProfilesPanel";
 
-type SidebarView = "options" | "profiles";
-
 const MODE_QUICK_TIPS: Record<AppMode, string> = {
   chat: "Ask about UFC, eligibility, or documents.",
   notes: "Use Notes bar: This chat vs All notes.",
   messenger: "Use @users and #dm, #email, #reminder.",
+  profiles: "Select a profile below to view and discuss.",
   evv: "Log visits and check-in/out.",
   customer_service: "Ask about clients, run eligibility, upload docs.",
   appointments: "Schedule via chat: e.g. \"Tomorrow at 2pm\".",
@@ -21,7 +20,6 @@ const MODE_QUICK_TIPS: Record<AppMode, string> = {
 
 export function RightSidebar() {
   const { rightSidebarOpen, setRightSidebarOpen, mode, setMode, setPendingAssistantMessage, activeClientId, setActiveClientId, userRole } = useApp();
-  const [view, setView] = useState<SidebarView>("options");
   const [activeClientName, setActiveClientName] = useState<string | null>(null);
   const supabase = createClient();
 
@@ -64,7 +62,7 @@ export function RightSidebar() {
       <div className="p-3 border-b border-slate-200 dark:border-zinc-700/50 shrink-0">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            {view === "options" ? "Options Menu" : "Profiles"}
+            Options Menu
           </h3>
           <button
             type="button"
@@ -79,53 +77,36 @@ export function RightSidebar() {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-3">
-        {view === "options" ? (
-          <>
-            {isAdmin && (
-              <div className="mb-3 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800/80 text-xs">
-                {activeClientId ? (
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-slate-600 dark:text-slate-400 truncate">
-                      Viewing: <strong className="text-slate-900 dark:text-slate-100">{activeClientName ?? "…"}</strong>
-                    </span>
-                    <button type="button" onClick={() => setActiveClientId(null)} className="shrink-0 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:underline">
-                      Clear
-                    </button>
-                  </div>
-                ) : (
-                  <span className="text-slate-500 dark:text-slate-400">No profile selected</span>
-                )}
+        {isAdmin && (
+          <div className="mb-3 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-zinc-800/80 text-xs">
+            {activeClientId ? (
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-slate-600 dark:text-slate-400 truncate">
+                  Viewing: <strong className="text-slate-900 dark:text-slate-100">{activeClientName ?? "…"}</strong>
+                </span>
+                <button type="button" onClick={() => setActiveClientId(null)} className="shrink-0 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:underline">
+                  Clear
+                </button>
               </div>
+            ) : (
+              <span className="text-slate-500 dark:text-slate-400">No profile selected</span>
             )}
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-              Select an option to enable that mode. The chat can do all of these — use this as a visual guide.
-            </p>
-            <ModeBar vertical onSelect={handleOptionSelect} />
-            <p className="text-xs text-slate-500 dark:text-slate-400 pt-3 mt-3 border-t border-slate-200 dark:border-zinc-700">
-              Current: {mode.replace("_", " ")}
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1" title={MODE_DESCRIPTIONS[mode]}>
-              {MODE_QUICK_TIPS[mode]}
-            </p>
-            <button
-              type="button"
-              onClick={() => setView("profiles")}
-              className="mt-3 block w-full py-2 px-3 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-center"
-            >
-              Profiles
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => setView("options")}
-              className="mb-3 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            >
-              ← Back to Options
-            </button>
-            <ProfilesPanel />
-          </>
+          </div>
+        )}
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          Select an option to enable that mode. The chat can do all of these — use this as a visual guide.
+        </p>
+        <ModeBar vertical onSelect={handleOptionSelect} />
+        <p className="text-xs text-slate-500 dark:text-slate-400 pt-3 mt-3 border-t border-slate-200 dark:border-zinc-700">
+          Current: {mode.replace("_", " ")}
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1" title={MODE_DESCRIPTIONS[mode]}>
+          {MODE_QUICK_TIPS[mode]}
+        </p>
+        {mode === "profiles" && (
+          <div className="mt-3 border-t border-slate-200 dark:border-zinc-700 pt-3">
+            <ProfilesPanel embedded />
+          </div>
         )}
       </div>
     </aside>

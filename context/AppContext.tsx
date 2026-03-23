@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export type AppMode = "chat" | "notes" | "messenger" | "evv" | "customer_service" | "appointments" | "supervisor" | "eligibility";
+export type AppMode = "chat" | "notes" | "messenger" | "profiles" | "evv" | "customer_service" | "appointments" | "supervisor" | "eligibility";
 
 export type PIPType = "settings" | "eligibility" | "document" | "expand" | "activity" | "supervisor_approval" | "message_center" | null;
 

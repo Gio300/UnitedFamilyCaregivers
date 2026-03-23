@@ -8,6 +8,7 @@ const MODES: { id: AppMode; label: string; icon: string }[] = [
   { id: "chat", label: "Chat", icon: "C" },
   { id: "notes", label: "Notes", icon: "N" },
   { id: "messenger", label: "Messenger", icon: "M" },
+  { id: "profiles", label: "Profiles", icon: "P" },
   { id: "evv", label: "EVV", icon: "E" },
   { id: "customer_service", label: "Customer Service", icon: "CS" },
   { id: "appointments", label: "Appointments", icon: "A" },
@@ -19,6 +20,7 @@ export const MODE_DESCRIPTIONS: Record<AppMode, string> = {
   chat: "Chat mode enabled. General AI chat — ask questions about United Family Caregivers, eligibility, documents, or anything else. Type your message and press Send.",
   notes: "Notes mode enabled. Call notes, activity log, and profile notes. Use the Notes bar below the chat to toggle \"This chat\" vs \"All notes\" and add auto-notes as you work.",
   messenger: "Messenger mode enabled. DMs, calls, and emails. Use the bell icon for Message Center. In chat you can mention @users and use #dm, #email, #reminder, #appointment, #call.",
+  profiles: "Profiles mode enabled. View and select client or caregiver profiles. Use the list below to pick a profile to view and discuss.",
   evv: "EVV mode enabled. Electronic Visit Verification for caregiver visits. Log visits and check-in/check-out. You can also manage this via chat.",
   customer_service: "Customer Service mode enabled. Client management, eligibility, documents, onboarding. Use chat to ask about clients, run eligibility checks, or upload documents.",
   appointments: "Appointments mode enabled. Schedule and view appointments. Use chat to schedule (e.g. \"Schedule appointment for @Client tomorrow at 2pm\") or ask about upcoming appointments.",
@@ -44,11 +46,11 @@ export function ModeBar({ vertical, onSelect }: { vertical?: boolean; onSelect?:
       supabase.from("profiles").select("role, approved_at").eq("id", user.id).single().then(({ data }) => {
         const role = data?.role || "client";
         const approved = !!data?.approved_at;
-        let base: AppMode[] = ["chat", "notes", "messenger", "evv"];
+        let base: AppMode[] = ["chat", "notes", "messenger", "profiles", "evv"];
         if (role === "csr_admin" && approved) {
-          base = ["chat", "notes", "messenger", "evv", "customer_service", "appointments", "eligibility"];
+          base = ["chat", "notes", "messenger", "profiles", "evv", "customer_service", "appointments", "eligibility"];
         } else if (role === "management_admin" && approved) {
-          base = ["chat", "notes", "messenger", "evv", "customer_service", "appointments", "supervisor", "eligibility"];
+          base = ["chat", "notes", "messenger", "profiles", "evv", "customer_service", "appointments", "supervisor", "eligibility"];
         }
         setVisibleModes(base);
       });

@@ -15,6 +15,7 @@ const MODE_PROMPTS = {
   chat: "General chat mode.",
   notes: "User is in Notes mode. Help with call notes, activity summaries, and documentation. When activeClientId is set, create_note can link to that client. For structured clinical notes, use create_clinical_note after creating an encounter.",
   messenger: "User is in Messenger mode. Help with DMs, calls, emails. Use @ for users, # for actions (dm, email, reminder, appointment, call).",
+  profiles: "User is in Profiles mode. Help with viewing and selecting client or caregiver profiles. Use list_clients when relevant.",
   evv: "User is in EVV mode. Help with visit verification and time tracking. Use list_encounters to show visit history for a client. EVV billing integration is not yet implemented.",
   customer_service: "User is in Customer Service mode. Help with client management, eligibility, documents, onboarding, encounters, medications, allergies, and notes. Use list_clients, list_encounters, list_medications, list_allergies, create_appointment, add_medication, add_allergy as needed.",
   appointments: "User is in Appointments mode. Help schedule and manage appointments. Use create_appointment (client_id, title, start_at, duration_minutes, notes) and list_appointments (client_id) to manage the schedule.",

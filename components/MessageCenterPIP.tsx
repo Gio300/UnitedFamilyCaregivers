@@ -131,7 +131,18 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
     combined.sort((a, b) => new Date(getDate(b)).getTime() - new Date(getDate(a)).getTime());
 
     const hadErrors = [remindersRes, callNotesRes, incomingRes, sentRes, activityRes, viewsRes].some((r) => r.error != null);
-    if (hadErrors) setFetchError(true);
+    if (hadErrors) {
+      const errs = [
+        { n: "reminders", e: remindersRes.error },
+        { n: "call_notes", e: callNotesRes.error },
+        { n: "incoming_emails", e: incomingRes.error },
+        { n: "sent_messages", e: sentRes.error },
+        { n: "activity_log", e: activityRes.error },
+        { n: "notification_views", e: viewsRes.error },
+      ].filter((x) => x.e).map((x) => `${x.n}:${x.e?.message || ""}`);
+      fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'MessageCenterPIP.tsx:fetchItems',message:'Message Center table errors',data:{errors:errs},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+      setFetchError(true);
+    }
 
     setItems(combined);
     setLoading(false);

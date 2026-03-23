@@ -20,7 +20,7 @@ interface ProfileRow {
   recent_work?: { call_reason?: string; disposition?: string; created_at: string }[];
 }
 
-export function ProfilesPanel() {
+export function ProfilesPanel({ embedded }: { embedded?: boolean } = {}) {
   const { setActiveClientId } = useApp();
   const router = useRouter();
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
@@ -38,7 +38,7 @@ export function ProfilesPanel() {
 
   const viewClient = (clientProfileId: string) => {
     setActiveClientId(clientProfileId);
-    router.push("/dashboard/profile");
+    if (!embedded) router.push("/dashboard/profile");
   };
 
   useEffect(() => {
