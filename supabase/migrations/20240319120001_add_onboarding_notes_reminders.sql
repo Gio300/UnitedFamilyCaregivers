@@ -1,8 +1,13 @@
 -- Migration: Add onboarding_completed, call_notes, reminders
 -- Idempotent: safe for fresh DB or schema_full-based DB
 
--- 1. Profile column (always)
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS onboarding_completed boolean DEFAULT false;
+-- 1. Profile column (when profiles exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='profiles') THEN
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS onboarding_completed boolean DEFAULT false;
+  END IF;
+END $$;
 
 -- 2. Call notes: create if missing, policy if table has user_id
 CREATE TABLE IF NOT EXISTS public.call_notes (

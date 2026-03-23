@@ -23,6 +23,11 @@ When deploying or fixing CI/CD, follow this cycle until all workflows succeed. M
 | Push migrations exit 1 | SQL error, schema mismatch, duplicate version | Check migration files; fix SQL; ensure unique timestamps; run `migration repair` if needed |
 | Build failure | TypeScript, lint, or dep errors | Fix code, types, or deps |
 
+## Success Criteria
+
+- **Deploy to GitHub Pages** – Must pass (site is live). Validation step warns but does not block.
+- **Push Supabase Migrations** – Should pass. Migrations are idempotent and handle missing profiles table.
+
 ## Rules
 
 - Do not remove instrumentation or validation until the fix is verified.
