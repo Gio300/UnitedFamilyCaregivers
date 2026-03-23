@@ -468,7 +468,7 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
               <p className="text-sm text-slate-500">No messages yet.</p>
               {fetchError && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Some tables returned errors. In Supabase SQL Editor, run migrations 006, 010, 016, 017 (see DEPLOY.md). Then seed_test_minimal.sql and seed_message_center.sql.
+                  Some tables returned errors. In Supabase SQL Editor, run migrations 006, 010, 014, 016, 017, 019 (see DEPLOY.md). Then seed_test_minimal.sql and seed_message_center.sql.
                 </p>
               )}
             </div>

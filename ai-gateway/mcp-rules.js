@@ -3,6 +3,19 @@
  * Used when AI is unavailable or for simple automatable queries.
  */
 
+const LIMITED_MODE_CAPS = `AI is in limited mode. I can help with these without full AI:
+
+• **Greeting / Help** – Say hello, hi, or "what can you do"
+• **Your profile** – "who am i", "my profile"
+• **Clients** – "list clients", "show my clients"
+• **Company info** – "company", "about", "provider type 30", "EVV"
+• **Nevada/Arizona** – Eligibility, waiver, payer info
+• **Notes** – "create note: your text here"
+• **Reminders** – "add reminder: your text here"
+• **Appointments / Encounters** – Select a client first, then "list appointments" or "list encounters"
+
+Try one of these, or ask something specific and I'll route to AI when it's available.`;
+
 const FAQ = {
   company: `United Family Caregivers (NV Care Solutions Inc.) serves Nevada and Arizona. Provider types: 30 (Personal Care, Habilitation, Attendant Care, Respite), 38/211 (IDD waiver). Services include Personal Care, Habilitation, Attendant Care, Respite, and Home Health.`,
   evv: `EVV: Procedure codes and modifiers must be UPPERCASE. PayerProgram format is two-part (e.g. "NVFFS PCS", "NVANT HH"). Sandata EVV: evv-registration.sandata.com, NV-DHCFP.`,
@@ -14,10 +27,15 @@ const FAQ = {
   appointments: `To list or schedule appointments, select a client from Profiles first. Use the Appointments mode (above EVV) or ask "list appointments for [client name]" with a client selected.`,
 };
 
-/** Intent: { pattern: RegExp, handler: 'tool'|'faq', tool?: string, args?: fn(msg)->object, faqKey?: string } */
+/** Intent: { pattern: RegExp, handler: 'tool'|'faq'|'caps', tool?: string, args?: fn(msg)->object, faqKey?: string } */
 const INTENTS = [
+  // Greetings & help (broader matching)
+  { pattern: /^(hi|hey|hello|hiya|howdy|greetings|good\s+(morning|afternoon|evening)|what'?s\s+up|sup|yo)\s*!?\.?$/i, handler: "caps", faqKey: "greeting" },
+  { pattern: /\b(what\s+can\s+you\s+do|help\s+me|options|capabilities|what\s+do\s+you\s+support)\b/i, handler: "caps", faqKey: "help" },
+  { pattern: /^\s*hello\s*\.?!?\s*$/i, handler: "caps", faqKey: "greeting" },
+  { pattern: /\bhello\b/i, handler: "caps", faqKey: "greeting" },
   // Tool-backed
-  { pattern: /\b(who am i|my profile|get my profile)\b/i, handler: "tool", tool: "get_profile" },
+  { pattern: /\b(who\s+am\s+i|my\s+profile|get\s+my\s+profile)\b/i, handler: "tool", tool: "get_profile" },
   { pattern: /\b(list|show)\s*(my\s+)?(clients?|profiles?)\b/i, handler: "tool", tool: "list_clients" },
   { pattern: /\b(list|show)\s*(appointments?|schedules?)\b/i, handler: "tool", tool: "list_appointments", needsClient: true },
   { pattern: /\b(list|show)\s*(encounters?|visits?|care\s+visits?)\b/i, handler: "tool", tool: "list_encounters", needsClient: true },
@@ -69,7 +87,15 @@ function extractReminderFromMessage(message) {
 
 async function handleMCPIntent(message, userContext, executeToolFn, userId) {
   const intent = detectIntent(message);
-  if (!intent) return { matched: false };
+
+  if (intent?.handler === "caps") {
+    const greeting = intent.faqKey === "greeting"
+      ? `Hello! ${LIMITED_MODE_CAPS}`
+      : LIMITED_MODE_CAPS;
+    return { matched: true, response: greeting, source: "mcp" };
+  }
+
+  if (!intent) return { matched: false, capabilities: LIMITED_MODE_CAPS };
 
   if (intent.handler === "faq") {
     const text = FAQ[intent.faqKey] || FAQ.company;

@@ -166,8 +166,9 @@ For Message Center (bell icon), profiles, AI Reply, and Notes to work:
    - `20240319120016_activity_session_link.sql` — session_id on activity_log, call_notes (for "This chat" notes scope)
    - `20240319120017_seed_message_center.sql` — Message Center seed
    - `20240319120018_seed_test_profiles_data.sql` — test_profiles seed (if using test profiles)
+   - `20240319120019_reminders_text_remind_at.sql` — reminders text/remind_at for Message Center
 
-   Or run `supabase/schema_full.sql` then migrations 006–018. Then seeds:
+   Or run `supabase/schema_full.sql` then migrations 006–019. Then seeds:
    - `supabase/seed_test_minimal.sql` (test profiles)
    - `supabase/seed_message_center.sql` (if not in migrations)
 

@@ -88,7 +88,11 @@ app.post("/api/mcp", requireAuth, async (req, res) => {
 
     const result = await handleMCPIntent(message, userContext || {}, executeToolFn, req.user.id);
     if (!result.matched) {
-      return res.status(404).json({ matched: false, error: "No MCP intent matched" });
+      return res.status(200).json({
+        response: result.capabilities || "AI is in limited mode. Try: 'who am i', 'list clients', 'company info', 'what can you do'.",
+        source: "mcp",
+        matched: false,
+      });
     }
     res.json({ response: result.response, source: result.source || "mcp" });
   } catch (err) {
