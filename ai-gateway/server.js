@@ -1,9 +1,11 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const nodemailer = require("nodemailer");
 const { createClient } = require("@supabase/supabase-js");
 const ollama = require("./ollama");
 const { TOOL_DEFINITIONS, executeTool } = require("./tools");
+const { handleMCPIntent } = require("./mcp-rules");
 
 const PORT = process.env.PORT || 7501;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -65,6 +67,34 @@ async function requireAuth(req, res, next) {
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "ufc-ai-gateway" });
+});
+
+app.post("/api/mcp", requireAuth, async (req, res) => {
+  try {
+    const { message, userContext } = req.body;
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ error: "message required" });
+    }
+
+    const token = req.headers.authorization?.startsWith("Bearer ")
+      ? req.headers.authorization.slice(7)
+      : null;
+    const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    });
+    const executeToolFn = async (name, args, userId) => {
+      return executeTool(name, args, supabaseWithAuth, userId, userContext || {});
+    };
+
+    const result = await handleMCPIntent(message, userContext || {}, executeToolFn, req.user.id);
+    if (!result.matched) {
+      return res.status(404).json({ matched: false, error: "No MCP intent matched" });
+    }
+    res.json({ response: result.response, source: result.source || "mcp" });
+  } catch (err) {
+    console.error("MCP error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/chat", requireAuth, async (req, res) => {
@@ -328,7 +358,23 @@ app.post("/api/notifications/auto-respond", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Message not found" });
     }
 
-    const result = await ollama.generateAutoResponse(messageContent, item_type, customerName);
+    let result;
+    try {
+      result = await ollama.generateAutoResponse(messageContent, item_type, customerName);
+    } catch (aiErr) {
+      const supabaseWithAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: req.headers.authorization ? { Authorization: req.headers.authorization } : {} },
+      });
+      const executeToolFn = async (name, args, userId) => {
+        return executeTool(name, args, supabaseWithAuth, userId, {});
+      };
+      const mcpResult = await handleMCPIntent(messageContent, {}, executeToolFn, req.user.id);
+      if (mcpResult.matched) {
+        result = { response: mcpResult.response, needs_human: false };
+      } else {
+        result = { response: "I'm in limited mode (AI unavailable). Please reply manually or try again later.", needs_human: true };
+      }
+    }
 
     await supabase.from("message_auto_responses").upsert(
       {
@@ -346,6 +392,62 @@ app.post("/api/notifications/auto-respond", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("Auto-respond error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+function getEmailTransporter() {
+  const host = process.env.MESSAGING_SMTP_HOST || process.env.SMTP_HOST;
+  const port = parseInt(process.env.MESSAGING_SMTP_PORT || process.env.SMTP_PORT || "587", 10);
+  const user = process.env.MESSAGING_SMTP_USER || process.env.SMTP_USER;
+  const pass = process.env.MESSAGING_SMTP_PASS || process.env.SMTP_PASS;
+  const secure = (process.env.MESSAGING_SMTP_SECURE || "tls").toLowerCase() === "ssl";
+  if (!host || !user || !pass) return null;
+  return nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+}
+
+app.post("/api/email/send", requireAuth, async (req, res) => {
+  try {
+    const { client_id, recipient_email, subject, body, sender_name } = req.body;
+    if (!recipient_email || !body) {
+      return res.status(400).json({ error: "recipient_email and body required" });
+    }
+
+    const transporter = getEmailTransporter();
+    if (!transporter) {
+      return res.status(503).json({
+        error: "Email not configured. Set MESSAGING_SMTP_HOST, MESSAGING_SMTP_USER, MESSAGING_SMTP_PASS in ai-gateway/.env",
+      });
+    }
+
+    const fromAddr = process.env.MESSAGING_FROM_EMAIL || process.env.MESSAGING_SMTP_USER || "noreply@ufc.local";
+    const fromName = sender_name || process.env.MESSAGING_FROM_NAME || "United Family Caregivers";
+
+    await transporter.sendMail({
+      from: `"${fromName}" <${fromAddr}>`,
+      to: recipient_email,
+      subject: subject || "(No subject)",
+      text: body,
+      html: (body || "").replace(/\n/g, "<br>"),
+    });
+
+    if (supabaseUrl && supabaseAnonKey && client_id) {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: req.headers.authorization ? { Authorization: req.headers.authorization } : {} },
+      });
+      const { error } = await supabase.from("sent_messages").insert({
+        client_id,
+        sender_name: sender_name || null,
+        recipient_email,
+        subject: subject || null,
+        body,
+      });
+      if (error) console.warn("Sent message insert failed:", error.message);
+    }
+
+    res.json({ success: true, message: "Email sent" });
+  } catch (err) {
+    console.error("Email send error:", err);
+    res.status(500).json({ error: err.message || "Failed to send email" });
   }
 });
 

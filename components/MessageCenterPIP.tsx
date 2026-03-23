@@ -20,6 +20,8 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [aiReplyLoading, setAiReplyLoading] = useState(false);
   const [aiReplyResult, setAiReplyResult] = useState<{ needs_human?: boolean; sent?: boolean; response?: string; error?: string } | null>(null);
+  const [sendEmailLoading, setSendEmailLoading] = useState(false);
+  const [sendEmailResult, setSendEmailResult] = useState<"success" | "error" | null>(null);
   const [fetchError, setFetchError] = useState(false);
   const supabase = createClient();
 
@@ -167,7 +169,57 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
     setSelectedItem(item);
     setView("detail");
     setAiReplyResult(null);
+    setSendEmailResult(null);
     markSeen(item);
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedItem || !aiReplyResult?.response) return;
+    const apiBase = getApiBase();
+    if (!apiBase) {
+      setSendEmailResult("error");
+      return;
+    }
+    setSendEmailLoading(true);
+    setSendEmailResult(null);
+    const d = selectedItem.data as Record<string, unknown>;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setSendEmailResult("error");
+        return;
+      }
+      const recipient_email =
+        selectedItem.type === "incoming_email"
+          ? String(d?.from_email || "")
+          : selectedItem.type === "sent_message"
+            ? String(d?.recipient_email || "")
+            : "";
+      const subject =
+        selectedItem.type === "incoming_email" || selectedItem.type === "sent_message"
+          ? (d?.subject ? `Re: ${d.subject}` : "") || "(No subject)"
+          : "(No subject)";
+      const client_id = d?.client_id as string | undefined;
+      const res = await fetch(`${apiBase}/api/email/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          client_id: client_id || null,
+          recipient_email,
+          subject,
+          body: aiReplyResult.response,
+          sender_name: undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setSendEmailResult(res.ok && data?.success ? "success" : "error");
+      if (res.ok && data?.success) fetchItems();
+    } catch {
+      setSendEmailResult("error");
+    } finally {
+      setSendEmailLoading(false);
+    }
   };
 
   const handleAiReply = async () => {
@@ -179,17 +231,61 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
     }
     setAiReplyLoading(true);
     setAiReplyResult(null);
+    const d = selectedItem.data as Record<string, unknown>;
+    const messageContent = String(d?.body || d?.subject || d?.notes || d?.call_reason || d?.text || "");
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setAiReplyResult({ needs_human: true, response: "Please sign in." });
+        return;
+      }
       const res = await fetch(`${apiBase}/api/notifications/auto-respond`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ item_type: selectedItem.type, item_id: selectedItem.id }),
       });
       const data = await res.json().catch(() => ({}));
-      setAiReplyResult(data);
-      if (!data.error) fetchItems();
+      if (!res.ok || data.error) {
+        if (messageContent.trim()) {
+          const mcpRes = await fetch(`${apiBase}/api/mcp`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ message: messageContent }),
+          });
+          if (mcpRes.ok) {
+            const mcpData = await mcpRes.json().catch(() => ({}));
+            if (mcpData?.response) {
+              setAiReplyResult({ needs_human: true, response: `[Suggested reply — no AI]\n${mcpData.response}` });
+              return;
+            }
+          }
+        }
+        setAiReplyResult({ needs_human: true, response: data.error || "Request failed" });
+      } else {
+        setAiReplyResult(data);
+        if (!data.error) fetchItems();
+      }
     } catch {
+      if (messageContent.trim()) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const mcpRes = await fetch(`${apiBase}/api/mcp`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ message: messageContent }),
+          });
+          if (mcpRes.ok) {
+            const mcpData = await mcpRes.json().catch(() => ({}));
+            if (mcpData?.response) {
+              setAiReplyResult({ needs_human: true, response: `[Suggested reply — no AI]\n${mcpData.response}` });
+              return;
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
       setAiReplyResult({ needs_human: true, response: "Request failed" });
     } finally {
       setAiReplyLoading(false);
@@ -328,7 +424,7 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
                 </>
               )}
               {canAiReply && (
-                <div className="pt-3 mt-3 border-t border-slate-200 dark:border-zinc-700">
+                <div className="pt-3 mt-3 border-t border-slate-200 dark:border-zinc-700 space-y-2">
                   <button
                     type="button"
                     onClick={handleAiReply}
@@ -338,15 +434,31 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
                     {aiReplyLoading ? "Processing…" : "AI Reply"}
                   </button>
                   {aiReplyResult && (
-                    <div className="mt-2 p-2 rounded bg-slate-100 dark:bg-zinc-800 text-sm">
-                      {aiReplyResult.needs_human ? (
-                        <p className="text-amber-600 dark:text-amber-400 font-medium">Needs human response.</p>
-                      ) : aiReplyResult.response ? (
-                        <p className="text-slate-700 dark:text-slate-300">{aiReplyResult.response}</p>
-                      ) : aiReplyResult.error ? (
-                        <p className="text-red-600 dark:text-red-400">{aiReplyResult.error}</p>
-                      ) : null}
-                    </div>
+                    <>
+                      <div className="mt-2 p-2 rounded bg-slate-100 dark:bg-zinc-800 text-sm">
+                        {aiReplyResult.needs_human ? (
+                          <p className="text-amber-600 dark:text-amber-400 font-medium">Needs human response.</p>
+                        ) : aiReplyResult.response ? (
+                          <p className="text-slate-700 dark:text-slate-300">{aiReplyResult.response}</p>
+                        ) : aiReplyResult.error ? (
+                          <p className="text-red-600 dark:text-red-400">{aiReplyResult.error}</p>
+                        ) : null}
+                      </div>
+                      {aiReplyResult.response && (selectedItem.type === "incoming_email" || selectedItem.type === "sent_message") && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleSendEmail}
+                            disabled={sendEmailLoading}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {sendEmailLoading ? "Sending…" : "Send Email"}
+                          </button>
+                          {sendEmailResult === "success" && <span className="text-sm text-emerald-600 dark:text-emerald-400">Sent.</span>}
+                          {sendEmailResult === "error" && <span className="text-sm text-red-600 dark:text-red-400">Send failed.</span>}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}

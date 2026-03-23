@@ -26,6 +26,7 @@ export function ChatPanel() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [mcpLimitedMode, setMcpLimitedMode] = useState(false);
   const [mentionUsers, setMentionUsers] = useState<{ id: string; full_name: string; email: string }[]>([]);
   const [showAtPicker, setShowAtPicker] = useState(false);
   const [atQuery, setAtQuery] = useState("");
@@ -188,7 +189,7 @@ export function ChatPanel() {
         return;
       }
 
-      let apiBase = getApiBase();
+      const apiBase = getApiBase();
       if (!apiBase) {
         setMessages((m) => [...m, { role: "assistant", content: "API base URL not configured. Set NEXT_PUBLIC_API_BASE in GitHub Secrets or .env.local." }]);
         return;
@@ -209,26 +210,56 @@ export function ChatPanel() {
 
       const history = messages.map(({ role, content }) => ({ role, content }));
       const useTools = userRole === "csr_admin" || userRole === "management_admin";
+      const userContext = {
+        role: userRole || undefined,
+        activeClientId: activeClientId || undefined,
+        activeClientName: activeClientName || undefined,
+        mode: mode || undefined,
+        session_id: effectiveSessionId || undefined,
+      };
       const body = JSON.stringify({
         message: userMsg.content,
-        history,
+        history: messages.map(({ role, content }) => ({ role, content })),
         attachments: userMsg.attachments,
-        userContext: {
-          role: userRole || undefined,
-          activeClientId: activeClientId || undefined,
-          activeClientName: activeClientName || undefined,
-          mode: mode || undefined,
-          session_id: effectiveSessionId || undefined,
-        },
+        userContext,
       });
       const fetchOpts = {
         method: "POST" as const,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
-          Accept: "text/event-stream",
         },
-        body,
+      };
+
+      const mcpBody = JSON.stringify({ message: userMsg.content, userContext });
+      let mcpRes: Response | null = null;
+      try {
+        mcpRes = await fetch(`${apiBase}/api/mcp`, {
+          ...fetchOpts,
+          headers: { ...fetchOpts.headers, Accept: "application/json" },
+          body: mcpBody,
+        });
+      } catch {
+        mcpRes = null;
+      }
+      if (mcpRes?.ok) {
+        const mcpData = await mcpRes.json().catch(() => ({}));
+        if (mcpData.response) {
+          setMessages((m) => [...m, { role: "assistant", content: mcpData.response }]);
+          return;
+        }
+      }
+
+      const chatBody = JSON.stringify({
+        message: userMsg.content,
+        history,
+        attachments: userMsg.attachments,
+        userContext,
+      });
+      const chatFetchOpts = {
+        ...fetchOpts,
+        headers: { ...fetchOpts.headers, Accept: "text/event-stream" },
+        body: chatBody,
       };
       const url = (base: string) => `${base}/api/chat?stream=1${useTools ? "&tools=1" : ""}`;
 
@@ -236,7 +267,7 @@ export function ChatPanel() {
       try {
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), 15000);
-        res = await fetch(url(apiBase), { ...fetchOpts, signal: controller.signal });
+        res = await fetch(url(apiBase), { ...chatFetchOpts, signal: controller.signal });
         clearTimeout(timeoutId);
       } catch (primaryErr) {
         clearTimeout(timeoutId);
@@ -245,7 +276,7 @@ export function ChatPanel() {
           try {
             const fallbackController = new AbortController();
             timeoutId = setTimeout(() => fallbackController.abort(), 20000);
-            res = await fetch(url("http://localhost:7501"), { ...fetchOpts, signal: fallbackController.signal });
+            res = await fetch(url("http://localhost:7501"), { ...chatFetchOpts, signal: fallbackController.signal });
             clearTimeout(timeoutId);
           } catch {
             setMessages((m) => [...m, { role: "assistant", content: "Request timed out. If you're on the same network as the server, ensure AI Gateway is running. External users: API works from the internet." }]);
@@ -288,18 +319,46 @@ export function ChatPanel() {
         }
       }
 
+      setMcpLimitedMode(false);
       setMessages((m) => [...m, { role: "assistant", content: content || "(No response)" }]);
     } catch (err) {
       if (timeoutId) clearTimeout(timeoutId);
       const errMsg = err instanceof Error ? err.message : "Unknown error";
       const isAbort = errMsg.includes("aborted") || errMsg.includes("timeout");
       const isFailedFetch = errMsg.includes("fetch") || errMsg.includes("Failed to fetch");
-      const displayMsg = isAbort
-        ? "Request timed out. See UFC_AI_FIX.md — fix DNS to use the tunnel, or use a quick tunnel (scripts\\start-tunnel-and-get-url.ps1)."
-        : isFailedFetch
-          ? "Failed to fetch. Set NEXT_PUBLIC_API_BASE in GitHub Secrets to your AI Gateway URL (e.g. Cloudflare tunnel, api.kloudykare.com). Ensure AI Gateway is running (cd ai-gateway && npm start)."
-          : `Error: ${errMsg}`;
-      setMessages((m) => [...m, { role: "assistant", content: displayMsg }]);
+      let mcpFallback: string | null = null;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const t = session?.access_token;
+        const base = getApiBase();
+        if (t && base) {
+          const mcpRes = await fetch(`${base}/api/mcp`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+            body: JSON.stringify({
+              message: userMsg.content,
+              userContext: { activeClientId: activeClientId || undefined, activeClientName: activeClientName || undefined, mode: mode || undefined },
+            }),
+          });
+          if (mcpRes.ok) {
+            const d = await mcpRes.json().catch(() => ({}));
+            if (d?.response) mcpFallback = d.response;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      if (mcpFallback) {
+        setMcpLimitedMode(true);
+        setMessages((m) => [...m, { role: "assistant", content: `[AI in limited mode]\n\n${mcpFallback}` }]);
+      } else {
+        const displayMsg = isAbort
+          ? "Request timed out. See UFC_AI_FIX.md — fix DNS to use the tunnel, or use a quick tunnel (scripts\\start-tunnel-and-get-url.ps1)."
+          : isFailedFetch
+            ? "Failed to fetch. Set NEXT_PUBLIC_API_BASE in GitHub Secrets to your AI Gateway URL (e.g. Cloudflare tunnel, api.kloudykare.com). Ensure AI Gateway is running (cd ai-gateway && npm start)."
+            : `Error: ${errMsg}`;
+        setMessages((m) => [...m, { role: "assistant", content: displayMsg }]);
+      }
     } finally {
       setLoading(false);
       setStreaming(false);
@@ -310,6 +369,12 @@ export function ChatPanel() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 border border-slate-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-black shadow-sm">
+      {mcpLimitedMode && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
+          <span>AI in limited mode — last response used MCP fallback.</span>
+          <button type="button" onClick={() => setMcpLimitedMode(false)} className="text-amber-600 hover:underline">Dismiss</button>
+        </div>
+      )}
       {isAdmin && activeClientId && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900/50 text-sm">
           <span className="text-slate-600 dark:text-slate-400">

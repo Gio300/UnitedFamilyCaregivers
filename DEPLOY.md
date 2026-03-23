@@ -117,6 +117,17 @@ Use `?tools=1` for tool-calling (non-streaming): `POST /api/chat?tools=1`
 - **Login "placeholder.supabase.co":** Build now validates `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` before build. If missing, deploy fails with a clear error. Ensure both secrets are set in Settings > Secrets and variables > Actions.
 - **Required GitHub Secrets:** `NEXT_PUBLIC_SUPABASE_URL` (https://YOUR_PROJECT.supabase.co), `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_DATABASE_URL` (for migrations; use Session pooler from Supabase Dashboard).
 
+## API Base Configuration
+
+| Context | Value |
+|---------|-------|
+| Local dev | `http://localhost:7501` |
+| UFC (Caddy from PC) | `https://api.unitedfamilycaregivers.com` (GitHub Secret) |
+| Kloudy shared | `https://api.kloudykare.com` |
+| Quick tunnel | `https://xxx.trycloudflare.com` (temporary) |
+
+**Verify chain**: Run `scripts/diagnose-ufc-chain.ps1` to confirm Ollama, AI Gateway, Caddy, and DNS.
+
 ## Troubleshooting AI
 
 | Symptom | Check |
@@ -148,16 +159,21 @@ For Message Center (bell icon), profiles, AI Reply, and Notes to work:
 
 1. **Supabase SQL Editor** – run migrations in order:
    - `20240319120006_fix_profiles_rls_recursion.sql` — profiles RLS for admins
+   - `20240319120007_approve_manager_johnny.sql` — approve johnny.allen32 (Eligibility/Appointments)
    - `20240319120010_notification_views_user_scoped.sql` — fixes Message Center 500s (unread count)
+   - `20240319120014_reminders_schema_align.sql` — reminders schema
    - `20240319120015_chat_sessions.sql` — chat_sessions table
    - `20240319120016_activity_session_link.sql` — session_id on activity_log, call_notes (for "This chat" notes scope)
    - `20240319120017_seed_message_center.sql` — Message Center seed
+   - `20240319120018_seed_test_profiles_data.sql` — test_profiles seed (if using test profiles)
 
-   Or run `supabase/schema_full.sql` then migrations 006–017. Then seeds:
+   Or run `supabase/schema_full.sql` then migrations 006–018. Then seeds:
    - `supabase/seed_test_minimal.sql` (test profiles)
    - `supabase/seed_message_center.sql` (if not in migrations)
 
 2. **notification_views** – migration `20240319120010_notification_views_user_scoped.sql` creates the user-scoped table (required for unread count).
+
+3. **Message Center table errors** – If "Some tables returned errors" persists: (a) Run migrations 006, 010, 014, 016, 017 in order; (b) Use the UFC Supabase project (not KloudyKare); (c) Ensure reminders has `target_user_id` and `text` (migration 014 adds target_user_id; if using schema_full, reminders uses creator_id, target_user_id, text, remind_at).
 
 ## Context Indicators (Admin)
 
