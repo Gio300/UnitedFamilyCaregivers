@@ -1,4 +1,6 @@
 -- Link activity_log and call_notes to chat sessions for "this chat" vs "all" scope
+SET statement_timeout TO 0;
+SET lock_timeout TO '120s';
 
 DO $$
 BEGIN

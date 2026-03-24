@@ -1,5 +1,7 @@
 -- One-shot fix: profiles RLS recursion + chat_sessions/chat_messages
 -- Log evidence: infinite recursion in profiles policy; chat_sessions table not found
+SET statement_timeout TO 0;
+SET lock_timeout TO '120s';
 
 -- 1. Fix profiles recursion: use SECURITY DEFINER functions (bypass RLS)
 CREATE OR REPLACE FUNCTION public.is_manager()

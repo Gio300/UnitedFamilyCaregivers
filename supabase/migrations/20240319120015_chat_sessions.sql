@@ -1,5 +1,7 @@
 -- Chat sessions for persisted chat history
 -- Links chat_sessions to chat_messages via session_id
+SET statement_timeout TO 0;
+SET lock_timeout TO '120s';
 
 CREATE TABLE IF NOT EXISTS public.chat_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

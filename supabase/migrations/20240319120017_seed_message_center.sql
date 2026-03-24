@@ -1,6 +1,8 @@
 -- Message Center test data: sent_messages, incoming_emails, activity_log
 -- Inserts 0 rows if client_profiles is empty (run seed_test_minimal first for data)
 -- Safe to run multiple times (incoming_emails uses ON CONFLICT)
+SET statement_timeout TO 0;
+SET lock_timeout TO '120s';
 
 INSERT INTO public.sent_messages (client_id, sender_name, recipient_email, subject, body)
 SELECT cp.id, 'Maria Caregiver', 'alice@example.com', 'Welcome to UFCi', 'Hi Alice, welcome to United Family Caregivers. Let me know if you have any questions.'

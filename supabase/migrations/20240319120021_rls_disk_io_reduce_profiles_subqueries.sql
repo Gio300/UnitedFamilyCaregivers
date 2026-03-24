@@ -1,6 +1,8 @@
 -- Reduce Disk IO / CPU: RLS policies that subquery public.profiles cause recursion or extra reads.
 -- Open tabs poll Message Center frequently; failed RLS amplifies load (Supabase Disk IO budget).
 -- Replaces EXISTS (SELECT 1 FROM profiles ...) with SECURITY DEFINER helpers.
+SET statement_timeout TO 0;
+SET lock_timeout TO '120s';
 
 CREATE OR REPLACE FUNCTION public.is_manager()
 RETURNS boolean

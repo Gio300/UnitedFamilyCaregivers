@@ -1,5 +1,7 @@
 -- Seed test_profiles with sample data for development when profiles table has no/limited data
 -- Run after 009_test_profiles_temporary.sql
+SET statement_timeout TO 0;
+SET lock_timeout TO '120s';
 
 DO $$
 BEGIN

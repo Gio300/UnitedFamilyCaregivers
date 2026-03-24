@@ -3,6 +3,8 @@
 -- Migration 001 creates: user_id, title, due_at
 -- Migration 014 adds: target_user_id, status
 -- This adds: text (from title), remind_at (from due_at)
+SET statement_timeout TO 0;
+SET lock_timeout TO '120s';
 
 DO $$
 BEGIN

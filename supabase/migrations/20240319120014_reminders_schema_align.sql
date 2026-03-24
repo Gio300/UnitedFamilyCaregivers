@@ -1,5 +1,7 @@
 -- Align reminders with schema expected by useMessageCenterUnread
 -- Migration 001 creates reminders with user_id only; this adds target_user_id and status
+SET statement_timeout TO 0;
+SET lock_timeout TO '120s';
 
 DO $$
 BEGIN

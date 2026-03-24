@@ -1,5 +1,7 @@
 -- Training reminders for compliance (auto DM + email)
 -- Run in Supabase SQL Editor
+SET statement_timeout TO 0;
+SET lock_timeout TO '120s';
 
 CREATE TABLE IF NOT EXISTS public.training_reminders (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
