@@ -16,6 +16,7 @@ Get-Content $envPath | ForEach-Object {
 if (-not $env:SUPABASE_DATABASE_URL) {
   Write-Error "SUPABASE_DATABASE_URL missing in .env.local"
 }
+$env:PGOPTIONS = "-c statement_timeout=600s -c lock_timeout=120s"
 $supa = Join-Path $env:LOCALAPPDATA "Supabase\supabase.exe"
 if (-not (Test-Path $supa)) { $supa = "supabase" }
 & $supa db push --db-url $env:SUPABASE_DATABASE_URL --yes

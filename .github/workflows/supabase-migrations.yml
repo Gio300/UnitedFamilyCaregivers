@@ -1,6 +1,7 @@
 # SUPABASE_DATABASE_URL secret must be set in Settings > Secrets > Actions.
-# Format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-REGION.pooler.supabase.com:5432/postgres
-# Use Session pooler URL from Supabase Dashboard > Settings > Database. Encode @ in password as %40.
+# Prefer Direct connection for db push (Settings > Database > URI, port 5432, host db.<PROJECT_REF>.supabase.co)
+# when you see: "canceling statement due to statement timeout" in graphql.increment_schema_version().
+# Session pooler also works; encode @ in password as %40.
 name: Push Supabase Migrations
 on:
   push:
@@ -34,10 +35,13 @@ jobs:
       - name: Repair legacy migration 001 (one-time cleanup if duplicate-key occurred)
         env:
           SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          PGOPTIONS: "-c statement_timeout=600s -c lock_timeout=120s"
         run: supabase migration repair 001 --status reverted --db-url "$SUPABASE_DATABASE_URL" || true
         continue-on-error: true
 
       - name: Push migrations
         env:
           SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          # Hosted Supabase runs graphql.increment_schema_version() on DDL; under Disk IO pressure it can exceed default statement_timeout.
+          PGOPTIONS: "-c statement_timeout=600s -c lock_timeout=120s"
         run: supabase db push --db-url "$SUPABASE_DATABASE_URL" --yes --debug

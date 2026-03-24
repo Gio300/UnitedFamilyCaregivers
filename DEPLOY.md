@@ -69,6 +69,8 @@ Or run migrations via GitHub Actions (Push Supabase Migrations workflow) or loca
 
 **Disk IO budget (Supabase email):** Heavy or failing queries + frequent polling drain IO. Apply migration `20240319120021_rls_disk_io_reduce_profiles_subqueries.sql` (via `db push` or SQL Editor)—replaces `profiles` subqueries in RLS with `SECURITY DEFINER` helpers. The app also polls Message Center only when the browser tab is visible and every 2 minutes (was 30s). If budget stays low, see [Supabase High Disk I/O](https://supabase.com/docs/guides/platform/exhaust-disk-io) and consider a compute upgrade.
 
+**GitHub Action `db push` fails with `statement timeout` / `graphql.increment_schema_version`:** The DB was busy (Disk IO) or the default Postgres `statement_timeout` killed DDL. The workflow sets `PGOPTIONS` to allow longer statements. If it still fails, set GitHub secret `SUPABASE_DATABASE_URL` to the **Direct connection** string (host `db.<project-ref>.supabase.co`, port `5432`) from Dashboard → Database, or run pending migration files in the SQL Editor and use `supabase migration repair` locally to align history.
+
 ## AI Gateway Startup
 
 ```bash
