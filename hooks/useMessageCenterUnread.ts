@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+
+/** Poll when tab visible only; 2 min interval to reduce Supabase Disk IO from idle tabs. */
+const POLL_MS = 120_000;
 
 export function useMessageCenterUnread() {
   const [count, setCount] = useState(0);
   const supabase = createClient();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -15,20 +19,15 @@ export function useMessageCenterUnread() {
     }
 
     const seen = new Set<string>();
-    // #region agent log
     try {
       const { data: views, error } = await supabase
         .from("notification_views")
         .select("item_type, item_id")
         .eq("user_id", user.id);
-      if (error) {
-        fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'useMessageCenterUnread.ts:notification_views',message:'notification_views query failed',data:{error:error.message,code:error.code},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
-      }
       if (!error && views) views.forEach((v) => seen.add(`${v.item_type}-${v.item_id}`));
-    } catch (e) {
-      fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'useMessageCenterUnread.ts:notification_views_catch',message:'notification_views exception',data:{err:String(e)},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
+    } catch {
+      /* ignore */
     }
-    // #endregion
 
     let total = 0;
     const add = (type: string, data: { id: string }[]) => {
@@ -37,7 +36,6 @@ export function useMessageCenterUnread() {
       });
     };
 
-    // Reminders: try target_user_id + status (schema_full); fallback to user_id (migration 001)
     try {
       let remindersData: { id: string }[] | null = null;
       const r1 = await supabase
@@ -76,9 +74,6 @@ export function useMessageCenterUnread() {
     }
     try {
       const { data, error } = await supabase.from("activity_log").select("id").eq("user_id", user.id).limit(100);
-      // #region agent log
-      if (error) fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'useMessageCenterUnread.ts:activity_log',message:'activity_log query failed',data:{error:error.message,code:error.code,details:error.details},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       if (!error) add("activity", data || []);
     } catch {
       /* ignore */
@@ -87,11 +82,37 @@ export function useMessageCenterUnread() {
     setCount(total);
   }, [supabase]);
 
+  const clearPoll = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const startPollIfVisible = useCallback(() => {
+    clearPoll();
+    if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+    intervalRef.current = setInterval(refresh, POLL_MS);
+  }, [clearPoll, refresh]);
+
   useEffect(() => {
     refresh();
-    const interval = setInterval(refresh, 30000);
-    return () => clearInterval(interval);
-  }, [refresh]);
+    startPollIfVisible();
+
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+        startPollIfVisible();
+      } else {
+        clearPoll();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      clearPoll();
+    };
+  }, [refresh, startPollIfVisible, clearPoll]);
 
   return { count, refresh };
 }

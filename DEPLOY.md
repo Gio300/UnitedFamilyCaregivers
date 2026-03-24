@@ -47,7 +47,27 @@ CREATE POLICY "Users manage own reminders" ON public.reminders FOR ALL USING (au
 
 Or run migrations via GitHub Actions (Push Supabase Migrations workflow) or locally: `supabase db push --db-url "$SUPABASE_DATABASE_URL" --yes`. Migrations use unique timestamps (e.g. `20240319120001_add_onboarding_notes_reminders.sql`).
 
+### Supabase CLI on Windows (local, no git push)
+
+**Note:** `npm install -g supabase` is not supported by the Supabase team. Use the installer script or the GitHub release tarball.
+
+1. **Install / upgrade CLI:** In PowerShell, from the `UnitedFamilyCaregivers` folder run `.\scripts\install-supabase-cli-windows.ps1` (from repo root: `UnitedFamilyCaregivers\scripts\install-supabase-cli-windows.ps1`). This installs to `%LOCALAPPDATA%\Supabase\supabase.exe` and adds that folder to your **User** PATH. Open a **new** terminal afterward.
+
+2. **What you need from Supabase Dashboard:** The same **Session pooler** connection string as GitHub Secret `SUPABASE_DATABASE_URL` (Settings → Database → Connection string → URI, pooler). Do not paste it into chat; set it only in your shell or a local file that is gitignored.
+
+3. **Push migrations from your PC:**
+   ```powershell
+   cd UnitedFamilyCaregivers
+   $env:SUPABASE_DATABASE_URL = "postgresql://postgres.PROJECTREF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres"
+   supabase db push --db-url $env:SUPABASE_DATABASE_URL --yes
+   ```
+   Or use **PowerShell’s** `$env:` for the session only; for a permanent local copy, add `SUPABASE_DATABASE_URL=...` to `.env.local` (never commit) and load it before running `db push`.
+
+4. **If `supabase` is not found:** Ensure Node’s folder is not required for the CLI (it is not). Confirm PATH includes `C:\Users\<you>\AppData\Local\Supabase` or call the binary directly: `& "$env:LOCALAPPDATA\Supabase\supabase.exe" --version`.
+
 **Manual fix (if profiles recursion or chat_sessions 404):** Run `supabase/migrations/20240319120020_fix_profiles_recursion_and_chat.sql` in Supabase SQL Editor. Fixes: infinite recursion in profiles RLS, creates chat_sessions + chat_messages.
+
+**Disk IO budget (Supabase email):** Heavy or failing queries + frequent polling drain IO. Apply migration `20240319120021_rls_disk_io_reduce_profiles_subqueries.sql` (via `db push` or SQL Editor)—replaces `profiles` subqueries in RLS with `SECURITY DEFINER` helpers. The app also polls Message Center only when the browser tab is visible and every 2 minutes (was 30s). If budget stays low, see [Supabase High Disk I/O](https://supabase.com/docs/guides/platform/exhaust-disk-io) and consider a compute upgrade.
 
 ## AI Gateway Startup
 
