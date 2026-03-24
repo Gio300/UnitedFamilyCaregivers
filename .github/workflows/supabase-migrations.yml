@@ -1,7 +1,8 @@
-# SUPABASE_DATABASE_URL secret must be set in Settings > Secrets > Actions.
-# Prefer Direct connection for db push (Settings > Database > URI, port 5432, host db.<PROJECT_REF>.supabase.co)
-# when you see: "canceling statement due to statement timeout" in graphql.increment_schema_version().
-# Session pooler also works; encode @ in password as %40.
+# Database URL secrets (Settings > Secrets > Actions) — at least one required:
+#   SUPABASE_DB_URL_DIRECT          — db.<ref>.supabase.co:5432 (best for long DDL; needs IPv6 or IPv4 add-on from runner)
+#   SUPABASE_DB_URL_SESSION_POOLER  — *.pooler.supabase.com:5432 (IPv4-friendly; may reset on very long runs)
+#   SUPABASE_DATABASE_URL           — legacy fallback if the above are unset
+# Encode @ in password as %40.
 name: Push Supabase Migrations
 on:
   push:
@@ -12,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     # Allow Deploy to succeed; migrations may need manual fix (see DEPLOY_CYCLE.md)
     continue-on-error: true
+    env:
+      SB_DIRECT: ${{ secrets.SUPABASE_DB_URL_DIRECT }}
+      SB_POOLER: ${{ secrets.SUPABASE_DB_URL_SESSION_POOLER }}
+      SB_LEGACY: ${{ secrets.SUPABASE_DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,29 +24,83 @@ jobs:
         with:
           version: latest
 
-      - name: Check SUPABASE_DATABASE_URL is configured
-        env:
-          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+      - name: Check database URL secrets
         run: |
-          if [ -z "$SUPABASE_DATABASE_URL" ]; then
-            echo "::error::SUPABASE_DATABASE_URL secret is not set. Add it in repo Settings > Secrets and variables > Actions. Format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@HOST.pooler.supabase.com:5432/postgres"
+          first=""
+          [ -n "$SB_DIRECT" ] && first="$SB_DIRECT"
+          [ -z "$first" ] && [ -n "$SB_POOLER" ] && first="$SB_POOLER"
+          [ -z "$first" ] && [ -n "$SB_LEGACY" ] && first="$SB_LEGACY"
+          if [ -z "$first" ]; then
+            echo "::error::Set at least one of SUPABASE_DB_URL_DIRECT, SUPABASE_DB_URL_SESSION_POOLER, or SUPABASE_DATABASE_URL"
             exit 1
           fi
-          if [[ "$SUPABASE_DATABASE_URL" != postgres* ]]; then
-            echo "::error::SUPABASE_DATABASE_URL must start with postgresql:// or postgres://"
+          if [[ "$first" != postgres* ]]; then
+            echo "::error::Database URL must start with postgresql:// or postgres://"
             exit 1
+          fi
+          if echo "$first" | grep -q 'pooler.supabase.com'; then
+            echo "::warning::First-resolved URL uses pooler. Prefer SUPABASE_DB_URL_DIRECT for long migrations when your runner can reach it (IPv6 / IPv4 add-on)."
           fi
 
       - name: Repair legacy migration 001 (one-time cleanup if duplicate-key occurred)
         env:
-          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
           PGOPTIONS: "-c statement_timeout=600s -c lock_timeout=120s"
-        run: supabase migration repair 001 --status reverted --db-url "$SUPABASE_DATABASE_URL" || true
+        run: |
+          first=""
+          [ -n "$SB_DIRECT" ] && first="$SB_DIRECT"
+          [ -z "$first" ] && [ -n "$SB_POOLER" ] && first="$SB_POOLER"
+          [ -z "$first" ] && [ -n "$SB_LEGACY" ] && first="$SB_LEGACY"
+          supabase migration repair 001 --status reverted --db-url "$first" || true
         continue-on-error: true
 
       - name: Push migrations
         env:
-          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
-          # Hosted Supabase runs graphql.increment_schema_version() on DDL; under Disk IO pressure it can exceed default statement_timeout.
           PGOPTIONS: "-c statement_timeout=600s -c lock_timeout=120s"
-        run: supabase db push --db-url "$SUPABASE_DATABASE_URL" --yes --debug
+        run: |
+          set -e
+          urls=()
+          add_url() {
+            local u="$1"
+            [ -z "$u" ] && return 0
+            local x
+            for x in "${urls[@]}"; do
+              [ "$x" = "$u" ] && return 0
+            done
+            urls+=("$u")
+          }
+          add_url "$SB_DIRECT"
+          add_url "$SB_POOLER"
+          add_url "$SB_LEGACY"
+          if [ ${#urls[@]} -eq 0 ]; then
+            echo "::error::No database URL secrets configured"
+            exit 1
+          fi
+
+          overall_ok=0
+          for url in "${urls[@]}"; do
+            if echo "$url" | grep -q 'pooler.supabase.com'; then
+              echo "::notice::db push: trying session pooler URL (order: direct → pooler → legacy)"
+            else
+              echo "::notice::db push: trying direct or non-pooler URL"
+            fi
+            ok=0
+            for i in 1 2 3; do
+              echo "::group::db push attempt $i/3 (this URL)"
+              if supabase db push --db-url "$url" --yes --debug; then
+                ok=1
+                echo "::endgroup::"
+                break
+              fi
+              echo "::endgroup::"
+              if [ "$i" -lt 3 ]; then
+                echo "Retry in 45s (timeouts / connection reset)..."
+                sleep 45
+              fi
+            done
+            if [ "$ok" -eq 1 ]; then
+              overall_ok=1
+              break
+            fi
+            echo "::warning::All retries failed for this URL; trying next secret if configured..."
+          done
+          test "$overall_ok" -eq 1
