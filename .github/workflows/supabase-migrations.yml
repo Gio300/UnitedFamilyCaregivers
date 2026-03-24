@@ -130,4 +130,59 @@ jobs:
               tried_non_pooler=1
             fi
           done
-          test "$overall_ok" -eq 1
+          if [ "$overall_ok" -eq 1 ]; then
+            exit 0
+          fi
+
+          echo "::warning::supabase db push failed for all URLs. Attempting psql fallback for missing migrations."
+          if ! command -v psql >/dev/null 2>&1; then
+            echo "::notice::Installing postgresql-client for fallback..."
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+          select_reachable_url() {
+            local u="$1"
+            [ -z "$u" ] && return 1
+            local j=1
+            while [ "$j" -le 3 ]; do
+              if psql "$u" -v ON_ERROR_STOP=1 -Atqc "select 1" >/dev/null 2>&1; then
+                return 0
+              fi
+              sleep 20
+              j=$((j + 1))
+            done
+            return 1
+          }
+
+          fallback_url=""
+          for url in "${urls[@]}"; do
+            if select_reachable_url "$url"; then
+              fallback_url="$url"
+              break
+            fi
+          done
+
+          if [ -z "$fallback_url" ]; then
+            echo "::error::No reachable database URL for psql fallback."
+            exit 1
+          fi
+
+          psql "$fallback_url" -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS supabase_migrations;"
+          psql "$fallback_url" -v ON_ERROR_STOP=1 -c "CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (version text PRIMARY KEY, name text, statements text[]);"
+          psql "$fallback_url" -Atqc "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;" > /tmp/remote_versions.txt
+
+          for file in $(printf '%s\n' supabase/migrations/*.sql | sort); do
+            base=$(basename "$file")
+            version="${base%%_*}"
+            name="${base#*_}"
+            name="${name%.sql}"
+            if grep -qxF "$version" /tmp/remote_versions.txt; then
+              continue
+            fi
+            echo "::notice::psql fallback applying $base"
+            psql "$fallback_url" -v ON_ERROR_STOP=1 -f "$file"
+            psql "$fallback_url" -v ON_ERROR_STOP=1 -c "INSERT INTO supabase_migrations.schema_migrations(version, name) VALUES ('$version', '$name') ON CONFLICT (version) DO NOTHING;"
+          done
+
+          echo "::notice::psql fallback completed."
