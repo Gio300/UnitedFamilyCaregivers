@@ -21,6 +21,24 @@ Invoke-WebRequest -Uri "http://localhost:7501/api/health" -UseBasicParsing
 Invoke-WebRequest -Uri "https://api.unitedfamilycaregivers.com/api/health" -UseBasicParsing
 ```
 
+### NAT hairpin (same LAN as Caddy)
+
+If `https://api.unitedfamilycaregivers.com` fails from a PC **on your home network** but works on **cellular**, your router likely lacks **NAT loopback / hairpin NAT**. Fix on each Windows PC that browses the dashboard:
+
+```powershell
+# PowerShell as Administrator — default: point hostname to Caddy LAN IP (matches typical port-forward target)
+cd UnitedFamilyCaregivers\scripts
+.\add-ufc-hosts-entry.ps1
+
+# Same machine as Caddy only, if you prefer loopback:
+# .\add-ufc-hosts-entry.ps1 -UseLoopback
+
+# Different LAN IP for the Caddy box:
+# .\add-ufc-hosts-entry.ps1 -LocalApiHostIp 192.168.0.100
+```
+
+Re-run the script after changing the Caddy PC’s IP. To remove the override later, delete the `api.unitedfamilycaregivers.com` line from `C:\Windows\System32\drivers\etc\hosts`.
+
 ### Restart services
 
 ```powershell
