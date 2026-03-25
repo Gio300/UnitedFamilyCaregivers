@@ -16,11 +16,11 @@ const MODE_PROMPTS = {
   notes: "User is in Notes mode. Help with call notes, activity summaries, and documentation. When activeClientId is set, create_note can link to that client. For structured clinical notes, use create_clinical_note after creating an encounter.",
   messenger: "User is in Messenger mode. Help with DMs, calls, emails. Use @ for users, # for actions (dm, email, reminder, appointment, call).",
   profiles: "User is in Profiles mode. Help with viewing and selecting client or caregiver profiles. Use list_clients when relevant.",
-  evv: "User is in EVV mode. Help with visit verification and time tracking. Use list_encounters to show visit history for a client. EVV billing integration is not yet implemented.",
-  customer_service: "User is in Customer Service mode. Help with client management, eligibility, documents, onboarding, encounters, medications, allergies, and notes. Use list_clients, list_encounters, list_medications, list_allergies, create_appointment, add_medication, add_allergy as needed.",
+  evv: "User is in EVV mode. Help with visit verification and time tracking. Use list_encounters to show visit history for a client. They can type **start checklist** or **evv checklist** for a Sandata-order guided pass (client → employee → visit). EVV billing integration is not yet implemented.",
+  customer_service: "User is in Customer Service mode. Help with client management, eligibility, documents, onboarding, encounters, medications, allergies, and notes. Use list_clients, list_encounters, list_medications, list_allergies, create_appointment, add_medication, add_allergy as needed. **start checklist** runs Sandata-shaped intake prompts.",
   appointments: "User is in Appointments mode. Help schedule and manage appointments. Use create_appointment (client_id, title, start_at, duration_minutes, notes) and list_appointments (client_id) to manage the schedule.",
   supervisor: "User is in Supervisor mode. Help with approvals, oversight, and team management.",
-  eligibility: "User is in Eligibility mode. Help check Nevada Medicaid eligibility. For 'Check eligibility for @Name', you need lastName, firstName, dob, and either recipientId or ssn. The system can run automated eligibility checks.",
+  eligibility: "User is in Eligibility mode. Help check Nevada Medicaid eligibility. For 'Check eligibility for @Name', you need lastName, firstName, dob, and either recipientId or ssn. The system can run automated eligibility checks. **start checklist** connects eligibility to Sandata payer row reminders.",
 };
 
 const ROLE_PROMPTS = {
@@ -275,4 +275,78 @@ async function generateActivitySummary(activities) {
   return response.trim();
 }
 
-module.exports = { generate, generateStream, generateWithTools, extractCallNoteFromText, generateActivitySummary, generateAutoResponse, MODEL_FAST, MODEL_SMART };
+const FLOW_ASSIST_INSTRUCTION = `You are Kloudy for United Family Caregivers (NV Care Solutions Inc.). Tone: urban, professional, concise — no slang overload.
+
+Sandata EVV (Nevada): Client row must load before visits; employee before visits; first visit submission needs Call In and Out. PayerID + PayerProgram + ProcedureCode combinations must match the state spec; HCPCS and modifiers are UPPERCASE.
+
+You are helping with ONE checklist step. Do not invent payer-specific facts not in the user message or prior answers.
+
+Return ONLY valid JSON (no markdown):
+{"assistant_message":"string","extracted":{},"next_step_id":null}
+
+- assistant_message: short reply acknowledging what they said; if unclear, ask one clarifying question.
+- extracted: optional flat object; only keys relevant to sandataKeys or obvious from text (e.g. ClientMedicaidID, PayerID, notes).
+- next_step_id: usually null unless the user clearly finished the step and you know the exact id; prefer null and let them use buttons.`;
+
+async function flowAssist({
+  userMessage,
+  flowId,
+  resumeStepId,
+  sandataKeys,
+  answers,
+  userContext,
+}) {
+  const prompt = `${FLOW_ASSIST_INSTRUCTION}
+
+flowId: ${flowId}
+current_step_id: ${resumeStepId}
+sandataKeys: ${JSON.stringify(sandataKeys || [])}
+answers_so_far: ${JSON.stringify(answers || {})}
+user_context: ${JSON.stringify(userContext || {})}
+
+User message:
+---
+${(userMessage || "").slice(0, 4000)}
+---
+
+JSON only:`;
+
+  const response = await generateWithModel(MODEL_FAST, prompt, []);
+  const jsonMatch = response.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return {
+      assistant_message: "I hear you — use a quick-reply button if you can, or say it shorter.",
+      extracted: {},
+      next_step_id: null,
+    };
+  }
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      assistant_message: String(parsed.assistant_message || "").slice(0, 2000),
+      extracted:
+        parsed.extracted && typeof parsed.extracted === "object" && !Array.isArray(parsed.extracted)
+          ? parsed.extracted
+          : {},
+      next_step_id: parsed.next_step_id || null,
+    };
+  } catch {
+    return {
+      assistant_message: "Say that again in one sentence — or pick a button.",
+      extracted: {},
+      next_step_id: null,
+    };
+  }
+}
+
+module.exports = {
+  generate,
+  generateStream,
+  generateWithTools,
+  extractCallNoteFromText,
+  generateActivitySummary,
+  generateAutoResponse,
+  flowAssist,
+  MODEL_FAST,
+  MODEL_SMART,
+};

@@ -6,6 +6,7 @@ const { createClient } = require("@supabase/supabase-js");
 const ollama = require("./ollama");
 const { TOOL_DEFINITIONS, executeTool } = require("./tools");
 const { handleMCPIntent } = require("./mcp-rules");
+const { handleMcpFlow, emptyContext, parseControlMessage } = require("./mcp-flow");
 
 const PORT = process.env.PORT || 7501;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -71,8 +72,16 @@ app.get("/api/health", (req, res) => {
 
 app.post("/api/mcp", requireAuth, async (req, res) => {
   try {
-    const { message, userContext } = req.body;
-    if (!message || typeof message !== "string") {
+    let { message, userContext, flowContext } = req.body;
+    if (typeof message !== "string") message = "";
+    const flowCtxIn = flowContext && typeof flowContext === "object" ? flowContext : null;
+    const hasFlowControl = parseControlMessage(message);
+    const flowActive =
+      flowCtxIn &&
+      flowCtxIn.flowId &&
+      !flowCtxIn.completed &&
+      (flowCtxIn.stepId || flowCtxIn.awaitingTypedReply);
+    if (!message.trim() && !hasFlowControl && !flowActive) {
       return res.status(400).json({ error: "message required" });
     }
 
@@ -86,10 +95,28 @@ app.post("/api/mcp", requireAuth, async (req, res) => {
       return executeTool(name, args, supabaseWithAuth, userId, userContext || {});
     };
 
+    const flowResult = await handleMcpFlow({
+      message,
+      flowContext: flowCtxIn,
+      userContext: userContext || {},
+      flowAssist: ollama.flowAssist,
+    });
+    if (flowResult.handled) {
+      return res.json({
+        response: flowResult.response,
+        source: flowResult.source || "mcp-flow",
+        matched: flowResult.matched !== false,
+        quickReplies: flowResult.quickReplies || [],
+        flowContext: flowResult.flowContext || emptyContext(),
+      });
+    }
+
     const result = await handleMCPIntent(message, userContext || {}, executeToolFn, req.user.id);
     if (!result.matched) {
       return res.status(200).json({
-        response: result.capabilities || "AI is in limited mode. Try: 'who am i', 'list clients', 'company info', 'what can you do'.",
+        response:
+          result.capabilities ||
+          "Here’s what I can do: profile, clients, company/EVV info, notes, reminders, appointments — or type **start checklist** for Sandata EVV order (client → employee → visit).",
         source: "mcp",
         matched: false,
       });

@@ -16,9 +16,19 @@ export interface ExpandPIPContent {
   content: ReactNode;
 }
 
+/** Optional chips for Sandata / MCP checklist (last assistant message only in UI). */
+export type ChatQuickReply = { id: string; label: string; payload: string };
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  attachments?: { name: string; url: string }[];
+  quickReplies?: ChatQuickReply[];
+}
+
 export interface ChatSession {
   id: string;
-  messages: { role: "user" | "assistant"; content: string; attachments?: { name: string; url: string }[] }[];
+  messages: ChatMessage[];
   preview: string;
   createdAt: number;
   title?: string;

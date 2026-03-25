@@ -3,7 +3,7 @@
  * Used when AI is unavailable or for simple automatable queries.
  */
 
-const LIMITED_MODE_CAPS = `AI is in limited mode. I can help with these without full AI:
+const HELP_CAPS = `Here’s what I can run from here:
 
 • **Greeting / Help** – Say hello, hi, or "what can you do"
 • **Your profile** – "who am i", "my profile"
@@ -13,8 +13,9 @@ const LIMITED_MODE_CAPS = `AI is in limited mode. I can help with these without 
 • **Notes** – "create note: your text here"
 • **Reminders** – "add reminder: your text here"
 • **Appointments / Encounters** – Select a client first, then "list appointments" or "list encounters"
+• **Sandata EVV checklist** – Type **start checklist** or **evv checklist** (NV order: client → employee → visit)
 
-Try one of these, or ask something specific and I'll route to AI when it's available.`;
+Ask anything else in your own words — I’ll pull in full AI when you’re not on a button flow.`;
 
 const FAQ = {
   company: `United Family Caregivers (NV Care Solutions Inc.) serves Nevada and Arizona. Provider types: 30 (Personal Care, Habilitation, Attendant Care, Respite), 38/211 (IDD waiver). Services include Personal Care, Habilitation, Attendant Care, Respite, and Home Health.`,
@@ -90,12 +91,12 @@ async function handleMCPIntent(message, userContext, executeToolFn, userId) {
 
   if (intent?.handler === "caps") {
     const greeting = intent.faqKey === "greeting"
-      ? `Hello! ${LIMITED_MODE_CAPS}`
-      : LIMITED_MODE_CAPS;
+      ? `Hello! ${HELP_CAPS}`
+      : HELP_CAPS;
     return { matched: true, response: greeting, source: "mcp" };
   }
 
-  if (!intent) return { matched: false, capabilities: LIMITED_MODE_CAPS };
+  if (!intent) return { matched: false, capabilities: HELP_CAPS };
 
   if (intent.handler === "faq") {
     const text = FAQ[intent.faqKey] || FAQ.company;

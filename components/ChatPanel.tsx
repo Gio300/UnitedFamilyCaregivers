@@ -3,14 +3,25 @@
 import { useState, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getApiBase } from "@/lib/api";
-import { useApp } from "@/context/AppContext";
+import { useApp, type AppMode, type ChatQuickReply } from "@/context/AppContext";
 import { AutoNotesBar } from "@/components/AutoNotesBar";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   attachments?: { name: string; url: string }[];
+  quickReplies?: ChatQuickReply[];
 }
+
+type StoredFlowContext = {
+  flowId: string | null;
+  stepId: string | null;
+  answers: Record<string, unknown>;
+  skipped: string[];
+  awaitingTypedReply?: boolean;
+  typedReplyResumeStep?: string | null;
+  completed?: boolean;
+};
 
 export function ChatPanel() {
   const { userRole, openPIP, chatResetKey, accentColor, addChatSession, updateChatSession, loadChatSession, currentSessionId, openChatSession, pendingAttachments, setPendingAttachments, activeClientId, setActiveClientId, mode, pendingAssistantMessage, setPendingAssistantMessage } = useApp();
@@ -27,6 +38,8 @@ export function ChatPanel() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [mcpLimitedMode, setMcpLimitedMode] = useState(false);
+  const [flowContext, setFlowContext] = useState<StoredFlowContext | null>(null);
+  const [showFlowNudge, setShowFlowNudge] = useState(false);
   const [mentionUsers, setMentionUsers] = useState<{ id: string; full_name: string; email: string }[]>([]);
   const [showAtPicker, setShowAtPicker] = useState(false);
   const [atQuery, setAtQuery] = useState("");
@@ -67,6 +80,45 @@ export function ChatPanel() {
       });
   }, [activeClientId, supabase]);
 
+  useEffect(() => {
+    if (!currentSessionId || typeof window === "undefined") return;
+    try {
+      const raw = sessionStorage.getItem(`ufc_mcp_flow_${currentSessionId}`);
+      if (!raw) {
+        setFlowContext(null);
+        return;
+      }
+      const p = JSON.parse(raw) as StoredFlowContext;
+      if (p?.flowId && !p.completed) setFlowContext(p);
+      else setFlowContext(null);
+    } catch {
+      setFlowContext(null);
+    }
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    if (!currentSessionId || typeof window === "undefined") return;
+    if (flowContext?.flowId && !flowContext.completed) {
+      sessionStorage.setItem(`ufc_mcp_flow_${currentSessionId}`, JSON.stringify(flowContext));
+    } else {
+      sessionStorage.removeItem(`ufc_mcp_flow_${currentSessionId}`);
+    }
+  }, [flowContext, currentSessionId]);
+
+  useEffect(() => {
+    if (!currentSessionId || typeof window === "undefined") {
+      setShowFlowNudge(false);
+      return;
+    }
+    const nudgeModes: AppMode[] = ["evv", "customer_service", "eligibility"];
+    if (!nudgeModes.includes(mode)) {
+      setShowFlowNudge(false);
+      return;
+    }
+    const dismissed = sessionStorage.getItem(`ufc_compliance_nudge_${currentSessionId}_${mode}`);
+    setShowFlowNudge(!dismissed && !flowContext?.flowId);
+  }, [mode, currentSessionId, flowContext?.flowId]);
+
   const HASH_ACTIONS = [
     { id: "dm", label: "DM", icon: "💬" },
     { id: "email", label: "Email", icon: "✉️" },
@@ -93,6 +145,7 @@ export function ChatPanel() {
       });
     }
     setMessages([]);
+    setFlowContext(null);
   }, [chatResetKey, addChatSession]);
 
   useEffect(() => {
@@ -171,10 +224,84 @@ export function ChatPanel() {
     return () => el.removeEventListener("scroll", check);
   }, [messages]);
 
+  function flowIdForMode(m: AppMode): string {
+    if (m === "evv") return "evv";
+    if (m === "customer_service") return "customer_service";
+    if (m === "eligibility") return "eligibility";
+    return "general";
+  }
+
+  function mergeFlowFromMcp(mcpData: Record<string, unknown>) {
+    if (!("flowContext" in mcpData)) return;
+    const fc = mcpData.flowContext as StoredFlowContext | undefined;
+    if (!fc || fc.completed || !fc.flowId) setFlowContext(null);
+    else setFlowContext(fc);
+  }
+
+  async function onQuickReply(q: ChatQuickReply) {
+    if (loading) return;
+    setMessages((m) => [
+      ...m.map((x) => (x.role === "assistant" ? { ...x, quickReplies: undefined } : x)),
+      { role: "user", content: q.label },
+    ]);
+    setLoading(true);
+    setStreaming(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setMessages((m) => [...m, { role: "assistant", content: "Please sign in to use chat." }]);
+        return;
+      }
+      const apiBase = getApiBase();
+      if (!apiBase) {
+        setMessages((m) => [...m, { role: "assistant", content: "API base URL not configured. Set NEXT_PUBLIC_API_BASE in GitHub Secrets or .env.local." }]);
+        return;
+      }
+      let effectiveSessionId = currentSessionId;
+      if (!effectiveSessionId) {
+        const sessionId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        addChatSession({ id: sessionId, messages: [], preview: q.label, createdAt: Date.now() });
+        openChatSession(sessionId);
+        effectiveSessionId = sessionId;
+      }
+      const inFlow = !!(flowContext?.flowId && !flowContext.completed);
+      const userContext = {
+        role: userRole || undefined,
+        activeClientId: activeClientId || undefined,
+        activeClientName: activeClientName || undefined,
+        mode: mode || undefined,
+        session_id: effectiveSessionId || undefined,
+      };
+      const mcpRes = await fetch(`${apiBase}/api/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, Accept: "application/json" },
+        body: JSON.stringify({
+          message: q.payload,
+          userContext,
+          ...(inFlow && flowContext ? { flowContext } : {}),
+        }),
+      });
+      const mcpData = mcpRes.ok ? await mcpRes.json().catch(() => ({})) : {};
+      if (mcpData.response) {
+        mergeFlowFromMcp(mcpData);
+        const qr = Array.isArray(mcpData.quickReplies) ? mcpData.quickReplies as ChatQuickReply[] : [];
+        setMessages((m) => [...m, { role: "assistant", content: mcpData.response as string, quickReplies: qr.length ? qr : undefined }]);
+      } else {
+        setMessages((m) => [...m, { role: "assistant", content: "Checklist request failed. Try again." }]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function sendMessage() {
     if ((!input.trim() && attachments.length === 0) || loading) return;
     const userMsg: Message = { role: "user", content: input.trim() || "(attachment)", attachments: attachments.length ? [...attachments] : undefined };
-    setMessages((m) => [...m, userMsg]);
+    setMessages((m) => [
+      ...m.map((x) => (x.role === "assistant" ? { ...x, quickReplies: undefined } : x)),
+      userMsg,
+    ]);
     setInput("");
     setAttachments([]);
     setLoading(true);
@@ -190,9 +317,6 @@ export function ChatPanel() {
       }
 
       const apiBase = getApiBase();
-      // #region agent log
-      fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'ChatPanel.tsx:sendMessage',message:'API base before fetch',data:{apiBase:apiBase||'(empty)',hasApiBase:!!apiBase},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       if (!apiBase) {
         setMessages((m) => [...m, { role: "assistant", content: "API base URL not configured. Set NEXT_PUBLIC_API_BASE in GitHub Secrets or .env.local." }]);
         return;
@@ -234,7 +358,12 @@ export function ChatPanel() {
         },
       };
 
-      const mcpBody = JSON.stringify({ message: userMsg.content, userContext });
+      const inFlow = !!(flowContext?.flowId && !flowContext.completed);
+      const mcpBody = JSON.stringify({
+        message: userMsg.content,
+        userContext,
+        ...(inFlow && flowContext ? { flowContext } : {}),
+      });
       let mcpRes: Response | null = null;
       try {
         mcpRes = await fetch(`${apiBase}/api/mcp`, {
@@ -248,9 +377,15 @@ export function ChatPanel() {
       if (mcpRes?.ok) {
         const mcpData = await mcpRes.json().catch(() => ({}));
         if (mcpData.response) {
-          setMessages((m) => [...m, { role: "assistant", content: mcpData.response }]);
+          mergeFlowFromMcp(mcpData);
+          const qr = Array.isArray(mcpData.quickReplies) ? mcpData.quickReplies as ChatQuickReply[] : [];
+          setMessages((m) => [...m, { role: "assistant", content: mcpData.response, quickReplies: qr.length ? qr : undefined }]);
+          setMcpLimitedMode(false);
           return;
         }
+      } else if (inFlow) {
+        setMessages((m) => [...m, { role: "assistant", content: "Couldn’t reach the checklist service. Check your connection and try again." }]);
+        return;
       }
 
       const chatBody = JSON.stringify({
@@ -329,26 +464,35 @@ export function ChatPanel() {
       const errMsg = err instanceof Error ? err.message : "Unknown error";
       const isAbort = errMsg.includes("aborted") || errMsg.includes("timeout");
       const isFailedFetch = errMsg.includes("fetch") || errMsg.includes("Failed to fetch");
-      // #region agent log
-      fetch('http://127.0.0.1:7314/ingest/b5f81f18-5968-433e-8c24-6d97348af981',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9b773e'},body:JSON.stringify({sessionId:'9b773e',location:'ChatPanel.tsx:catch',message:'Chat fetch error',data:{errMsg,isFailedFetch,isAbort,apiBase:getApiBase()||'(empty)'},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       let mcpFallback: string | null = null;
+      let mcpFallbackQr: ChatQuickReply[] | undefined;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const t = session?.access_token;
         const base = getApiBase();
+        const inFlowCatch = !!(flowContext?.flowId && !flowContext.completed);
         if (t && base) {
           const mcpRes = await fetch(`${base}/api/mcp`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
             body: JSON.stringify({
               message: userMsg.content,
-              userContext: { activeClientId: activeClientId || undefined, activeClientName: activeClientName || undefined, mode: mode || undefined },
+              userContext: {
+                role: userRole || undefined,
+                activeClientId: activeClientId || undefined,
+                activeClientName: activeClientName || undefined,
+                mode: mode || undefined,
+              },
+              ...(inFlowCatch && flowContext ? { flowContext } : {}),
             }),
           });
           if (mcpRes.ok) {
             const d = await mcpRes.json().catch(() => ({}));
-            if (d?.response) mcpFallback = d.response;
+            if (d?.response) {
+              mcpFallback = d.response;
+              if (Array.isArray(d.quickReplies)) mcpFallbackQr = d.quickReplies;
+              mergeFlowFromMcp(d);
+            }
           }
         }
       } catch {
@@ -356,7 +500,7 @@ export function ChatPanel() {
       }
       if (mcpFallback) {
         setMcpLimitedMode(true);
-        setMessages((m) => [...m, { role: "assistant", content: `[AI in limited mode]\n\n${mcpFallback}` }]);
+        setMessages((m) => [...m, { role: "assistant", content: mcpFallback!, quickReplies: mcpFallbackQr?.length ? mcpFallbackQr : undefined }]);
       } else {
         const displayMsg = isAbort
           ? "Request timed out. See UFC_AI_FIX.md — fix DNS to use the tunnel, or use a quick tunnel (scripts\\start-tunnel-and-get-url.ps1)."
@@ -373,12 +517,51 @@ export function ChatPanel() {
 
   const isAdmin = userRole === "csr_admin" || userRole === "management_admin";
 
+  let lastQuickReplyIdx = -1;
+  messages.forEach((m, i) => {
+    if (m.role === "assistant" && m.quickReplies && m.quickReplies.length > 0) lastQuickReplyIdx = i;
+  });
+
   return (
     <div className="flex flex-col flex-1 min-h-0 border border-slate-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-black shadow-sm">
       {mcpLimitedMode && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
           <span>AI in limited mode — last response used MCP fallback.</span>
           <button type="button" onClick={() => setMcpLimitedMode(false)} className="text-amber-600 hover:underline">Dismiss</button>
+        </div>
+      )}
+      {showFlowNudge && currentSessionId && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900/80 text-sm">
+          <span className="text-slate-700 dark:text-slate-300">
+            Run a quick <strong>Sandata EVV</strong> checklist (client → employee → visit)?
+          </span>
+          <div className="flex gap-2 shrink-0">
+            <button
+              type="button"
+              className="text-xs font-medium px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={() =>
+                void onQuickReply({
+                  id: "_nudge_start",
+                  label: "Run Sandata checklist",
+                  payload: `__FLOW__:${JSON.stringify({ action: "start", flowId: flowIdForMode(mode) })}`,
+                })
+              }
+            >
+              Run checklist
+            </button>
+            <button
+              type="button"
+              className="text-xs text-slate-500 hover:underline"
+              onClick={() => {
+                if (currentSessionId && typeof window !== "undefined") {
+                  sessionStorage.setItem(`ufc_compliance_nudge_${currentSessionId}_${mode}`, "1");
+                }
+                setShowFlowNudge(false);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
       {isAdmin && activeClientId && (
@@ -444,6 +627,21 @@ export function ChatPanel() {
                   })}
                 </div>
               ) : null}
+              {m.role === "assistant" && i === lastQuickReplyIdx && m.quickReplies && m.quickReplies.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2 justify-start max-w-[95%]">
+                  {m.quickReplies.map((q) => (
+                    <button
+                      key={q.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void onQuickReply(q)}
+                      className="text-xs px-3 py-1.5 rounded-full border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-zinc-700 disabled:opacity-50"
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {(m.content.length > 100 || m.attachments?.length) && (
                 <button
                   type="button"
