@@ -68,6 +68,20 @@ jobs:
         run: |
           set -e
           is_pooler_url() { echo "$1" | grep -q 'pooler.supabase.com'; }
+          is_sslmode_present() { echo "$1" | grep -q 'sslmode='; }
+          mask_url() {
+            local u="$1"
+            # Keep only scheme/host:port/db for diagnostics; never print credentials.
+            echo "$u" | sed -E 's#^(postgres(ql)?://)[^@]+@#\1***@#'
+          }
+          log_diag() {
+            local hypothesis_id="$1"
+            local msg="$2"
+            local data="$3"
+            #region agent log
+            echo "{\"sessionId\":\"9b773e\",\"runId\":\"gha-migrations\",\"hypothesisId\":\"${hypothesis_id}\",\"location\":\".github/workflows/supabase-migrations.yml:Push migrations\",\"message\":\"${msg}\",\"data\":${data},\"timestamp\":$(date +%s%3N)}"
+            #endregion
+          }
 
           urls=()
           add_url() {
@@ -146,9 +160,32 @@ jobs:
             [ -z "$u" ] && return 1
             local j=1
             while [ "$j" -le 3 ]; do
-              if psql "$u" -v ON_ERROR_STOP=1 -Atqc "select 1" >/dev/null 2>&1; then
+              local probe="$u"
+              local probe_variant="as-is"
+              if [ "$j" -gt 1 ] && ! is_sslmode_present "$u"; then
+                probe="${u}?sslmode=require"
+                probe_variant="sslmode=require"
+              fi
+              local masked
+              masked="$(mask_url "$probe")"
+              log_diag "H1" "fallback probe start" "{\"attempt\":$j,\"variant\":\"${probe_variant}\",\"url\":\"${masked}\"}"
+              if psql "$probe" -v ON_ERROR_STOP=1 -Atqc "select 1" >/dev/null 2>/tmp/psql_probe_err.txt; then
+                log_diag "H1" "fallback probe success" "{\"attempt\":$j,\"variant\":\"${probe_variant}\",\"url\":\"${masked}\"}"
                 return 0
               fi
+              local err
+              err="$(tr '\n' ' ' </tmp/psql_probe_err.txt | sed -E 's/[[:space:]]+/ /g' | sed 's/\\/\\\\/g; s/"/\\"/g' | cut -c1-280)"
+              local category="unknown"
+              if echo "$err" | grep -qiE "SSL|sslmode|no pg_hba|TLS"; then
+                category="ssl"
+              elif echo "$err" | grep -qiE "MaxClientsInSessionMode|Circuit breaker|Authentication query failed"; then
+                category="pooler_capacity"
+              elif echo "$err" | grep -qiE "timeout|could not connect|No route to host|Name or service not known|Temporary failure in name resolution"; then
+                category="network"
+              elif echo "$err" | grep -qiE "invalid connection option|invalid URI|could not parse"; then
+                category="url_format"
+              fi
+              log_diag "H2" "fallback probe failure" "{\"attempt\":$j,\"variant\":\"${probe_variant}\",\"category\":\"${category}\",\"url\":\"${masked}\",\"error\":\"${err}\"}"
               sleep 20
               j=$((j + 1))
             done
@@ -164,6 +201,7 @@ jobs:
           done
 
           if [ -z "$fallback_url" ]; then
+            log_diag "H3" "fallback no reachable url" "{\"direct_set\":$([ -n "$SB_DIRECT" ] && echo true || echo false),\"pooler_set\":$([ -n "$SB_POOLER" ] && echo true || echo false),\"legacy_set\":$([ -n "$SB_LEGACY" ] && echo true || echo false)}"
             echo "::error::No reachable database URL for psql fallback."
             exit 1
           fi
