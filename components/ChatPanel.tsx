@@ -24,7 +24,7 @@ type StoredFlowContext = {
 };
 
 export function ChatPanel() {
-  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, updateChatSession, loadChatSession, currentSessionId, openChatSession, pendingAttachments, setPendingAttachments, activeClientId, setActiveClientId, mode, pendingAssistantMessage, setPendingAssistantMessage } = useApp();
+  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, updateChatSession, loadChatSession, currentSessionId, openChatSession, pendingAttachments, setPendingAttachments, activeClientId, setActiveClientId, mode, pendingAssistantMessage, setPendingAssistantMessage, resetChat } = useApp();
   const [activeClientName, setActiveClientName] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
@@ -146,6 +146,9 @@ export function ChatPanel() {
     }
     setMessages([]);
     setFlowContext(null);
+    setMcpLimitedMode(false);
+    setInput("");
+    setAttachments([]);
   }, [chatResetKey, addChatSession]);
 
   useEffect(() => {
@@ -525,9 +528,9 @@ export function ChatPanel() {
   return (
     <div className="flex flex-col flex-1 min-h-0 border border-slate-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-black shadow-sm">
       {mcpLimitedMode && (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
-          <span>AI in limited mode — last response used MCP fallback.</span>
-          <button type="button" onClick={() => setMcpLimitedMode(false)} className="text-amber-600 hover:underline">Dismiss</button>
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 dark:bg-zinc-800/80 border-b border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-slate-300 text-sm">
+          <span>That reply used quick commands — the live AI stream wasn't available for that request.</span>
+          <button type="button" onClick={() => setMcpLimitedMode(false)} className="text-emerald-600 dark:text-emerald-400 hover:underline shrink-0">Dismiss</button>
         </div>
       )}
       {showFlowNudge && currentSessionId && (
@@ -564,6 +567,21 @@ export function ChatPanel() {
           </div>
         </div>
       )}
+      <div className="flex items-center justify-end gap-2 px-3 py-1.5 border-b border-slate-200 dark:border-zinc-700 bg-slate-50/80 dark:bg-zinc-900/40 shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            if (loading) return;
+            resetChat();
+          }}
+          disabled={loading}
+          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-50 text-lg font-medium leading-none"
+          title="New chat"
+          aria-label="New chat"
+        >
+          +
+        </button>
+      </div>
       {isAdmin && activeClientId && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900/50 text-sm">
           <span className="text-slate-600 dark:text-slate-400">
@@ -700,8 +718,9 @@ export function ChatPanel() {
           </button>
         )}
       </div>
+      <div className="shrink-0 bg-white dark:bg-black border-t border-slate-200 dark:border-zinc-700 sticky bottom-0 z-[5]">
       <AutoNotesBar clientId={activeClientId} userId={currentUserId} />
-      <div className="p-3 border-t border-slate-200 dark:border-zinc-700 space-y-2">
+      <div className="p-3 space-y-2">
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {attachments.map((a, i) => (
@@ -825,6 +844,7 @@ export function ChatPanel() {
           Send
         </button>
         </div>
+      </div>
       </div>
     </div>
   );

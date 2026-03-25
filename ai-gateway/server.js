@@ -403,7 +403,7 @@ app.post("/api/notifications/auto-respond", requireAuth, async (req, res) => {
       if (mcpResult.matched) {
         result = { response: mcpResult.response, needs_human: false };
       } else {
-        result = { response: "I'm in limited mode (AI unavailable). Please reply manually or try again later.", needs_human: true };
+        result = { response: "AI drafting wasn't available. Please reply manually or try again shortly.", needs_human: true };
       }
     }
 
