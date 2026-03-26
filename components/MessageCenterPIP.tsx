@@ -12,6 +12,37 @@ export type MessageCenterItem =
   | { type: "activity"; id: string; data: { action_type: string; details?: Record<string, unknown> | string; created_at: string; client_id?: string } }
   | { type: "appointment"; id: string; data: { title: string; start_at: string; status: string; client_id?: string; caregiver_id?: string } };
 
+/** When auto-respond fails: MCP if matched rule/tool, else non-streaming /api/chat. */
+async function suggestedReplyViaMcpOrChat(apiBase: string, token: string, message: string): Promise<string | null> {
+  try {
+    const mcpRes = await fetch(`${apiBase}/api/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ message }),
+    });
+    if (mcpRes.ok) {
+      const mcpData = await mcpRes.json().catch(() => ({}));
+      const t = typeof mcpData.response === "string" ? mcpData.response.trim() : "";
+      if (mcpData.matched === true && t) {
+        return `[Suggested reply — quick commands]\n${t}`;
+      }
+    }
+    const chatRes = await fetch(`${apiBase}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ message, history: [], userContext: {} }),
+    });
+    if (chatRes.ok) {
+      const cd = await chatRes.json().catch(() => ({}));
+      const c = typeof cd.content === "string" ? cd.content.trim() : "";
+      if (c) return `[Suggested reply — AI]\n${c}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; embedded?: boolean }) {
   const [items, setItems] = useState<MessageCenterItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,17 +281,10 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
         if (messageContent.trim()) {
-          const mcpRes = await fetch(`${apiBase}/api/mcp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ message: messageContent }),
-          });
-          if (mcpRes.ok) {
-            const mcpData = await mcpRes.json().catch(() => ({}));
-            if (mcpData?.response) {
-              setAiReplyResult({ needs_human: true, response: `[Suggested reply — no AI]\n${mcpData.response}` });
-              return;
-            }
+          const suggested = await suggestedReplyViaMcpOrChat(apiBase, token, messageContent);
+          if (suggested) {
+            setAiReplyResult({ needs_human: true, response: suggested });
+            return;
           }
         }
         setAiReplyResult({ needs_human: true, response: data.error || "Request failed" });
@@ -272,15 +296,11 @@ export function MessageCenterPIP({ onClose, embedded }: { onClose: () => void; e
       if (messageContent.trim()) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
-          const mcpRes = await fetch(`${apiBase}/api/mcp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-            body: JSON.stringify({ message: messageContent }),
-          });
-          if (mcpRes.ok) {
-            const mcpData = await mcpRes.json().catch(() => ({}));
-            if (mcpData?.response) {
-              setAiReplyResult({ needs_human: true, response: `[Suggested reply — no AI]\n${mcpData.response}` });
+          const t = session?.access_token;
+          if (t) {
+            const suggested = await suggestedReplyViaMcpOrChat(apiBase, t, messageContent);
+            if (suggested) {
+              setAiReplyResult({ needs_human: true, response: suggested });
               return;
             }
           }

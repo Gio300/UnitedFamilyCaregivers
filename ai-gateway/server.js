@@ -113,15 +113,14 @@ app.post("/api/mcp", requireAuth, async (req, res) => {
 
     const result = await handleMCPIntent(message, userContext || {}, executeToolFn, req.user.id);
     if (!result.matched) {
-      return res.status(200).json({
-        response:
-          result.capabilities ||
-          "Here’s what I can do: profile, clients, company/EVV info, notes, reminders, appointments — or type **start checklist** for Sandata EVV order (client → employee → visit).",
-        source: "mcp",
-        matched: false,
-      });
+      // No user-facing response: client should call /api/chat (Ollama) for open-ended messages.
+      return res.status(200).json({ matched: false, source: "mcp" });
     }
-    res.json({ response: result.response, source: result.source || "mcp" });
+    res.json({
+      matched: true,
+      response: result.response,
+      source: result.source || "mcp",
+    });
   } catch (err) {
     console.error("MCP error:", err);
     res.status(500).json({ error: err.message });
@@ -467,6 +466,7 @@ app.post("/api/email/send", requireAuth, async (req, res) => {
       });
       const { error } = await supabase.from("sent_messages").insert({
         client_id,
+        sender_user_id: req.user?.id || null,
         sender_name: sender_name || null,
         recipient_email,
         subject: subject || null,

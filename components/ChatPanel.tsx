@@ -5,6 +5,15 @@ import { createClient } from "@/lib/supabase/client";
 import { getApiBase } from "@/lib/api";
 import { useApp, type AppMode, type ChatQuickReply } from "@/context/AppContext";
 import { AutoNotesBar } from "@/components/AutoNotesBar";
+import { NewMessageComposer, type ComposerChannel, type ComposerRecipient } from "@/components/NewMessageComposer";
+
+const HASH_TO_COMPOSER: Record<string, ComposerChannel> = {
+  dm: "dm",
+  email: "email",
+  reminder: "reminder",
+  appointment: "appointment",
+  call: "call",
+};
 
 interface Message {
   role: "user" | "assistant";
@@ -48,8 +57,23 @@ export function ChatPanel() {
   const [hashQuery, setHashQuery] = useState("");
   const [hashIndex, setHashIndex] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerChannel, setComposerChannel] = useState<ComposerChannel>("dm");
+  const [composerRecipient, setComposerRecipient] = useState<ComposerRecipient | null>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+
+  const openComposerFromHash = (actionId: string) => {
+    setComposerChannel(HASH_TO_COMPOSER[actionId] || "dm");
+    setComposerRecipient(null);
+    setComposerOpen(true);
+  };
+
+  const openComposerFromMention = (u: { id: string; full_name: string; email: string }) => {
+    setComposerChannel("dm");
+    setComposerRecipient({ id: u.id, full_name: u.full_name, email: u.email || null });
+    setComposerOpen(true);
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id ?? null));
@@ -286,10 +310,11 @@ export function ChatPanel() {
         }),
       });
       const mcpData = mcpRes.ok ? await mcpRes.json().catch(() => ({})) : {};
-      if (mcpData.response) {
-        mergeFlowFromMcp(mcpData);
+      mergeFlowFromMcp(mcpData);
+      const qrText = typeof mcpData.response === "string" ? mcpData.response.trim() : "";
+      if (mcpData.matched === true && qrText) {
         const qr = Array.isArray(mcpData.quickReplies) ? mcpData.quickReplies as ChatQuickReply[] : [];
-        setMessages((m) => [...m, { role: "assistant", content: mcpData.response as string, quickReplies: qr.length ? qr : undefined }]);
+        setMessages((m) => [...m, { role: "assistant", content: qrText, quickReplies: qr.length ? qr : undefined }]);
       } else {
         setMessages((m) => [...m, { role: "assistant", content: "Checklist request failed. Try again." }]);
       }
@@ -379,10 +404,11 @@ export function ChatPanel() {
       }
       if (mcpRes?.ok) {
         const mcpData = await mcpRes.json().catch(() => ({}));
-        if (mcpData.response) {
-          mergeFlowFromMcp(mcpData);
+        mergeFlowFromMcp(mcpData);
+        const mcpText = typeof mcpData.response === "string" ? mcpData.response.trim() : "";
+        if (mcpData.matched === true && mcpText) {
           const qr = Array.isArray(mcpData.quickReplies) ? mcpData.quickReplies as ChatQuickReply[] : [];
-          setMessages((m) => [...m, { role: "assistant", content: mcpData.response, quickReplies: qr.length ? qr : undefined }]);
+          setMessages((m) => [...m, { role: "assistant", content: mcpText, quickReplies: qr.length ? qr : undefined }]);
           setMcpLimitedMode(false);
           return;
         }
@@ -491,10 +517,11 @@ export function ChatPanel() {
           });
           if (mcpRes.ok) {
             const d = await mcpRes.json().catch(() => ({}));
-            if (d?.response) {
-              mcpFallback = d.response;
+            mergeFlowFromMcp(d);
+            const fb = typeof d?.response === "string" ? d.response.trim() : "";
+            if (d?.matched === true && fb) {
+              mcpFallback = fb;
               if (Array.isArray(d.quickReplies)) mcpFallbackQr = d.quickReplies;
-              mergeFlowFromMcp(d);
             }
           }
         }
@@ -788,14 +815,34 @@ export function ChatPanel() {
                 const filtered = mentionUsers.filter((u) => (u.full_name || "").toLowerCase().includes(atQuery));
                 if (e.key === "ArrowDown") { e.preventDefault(); setAtIndex((i) => Math.min(i + 1, filtered.length - 1)); return; }
                 if (e.key === "ArrowUp") { e.preventDefault(); setAtIndex((i) => Math.max(i - 1, 0)); return; }
-                if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); const u = filtered[atIndex]; if (u) { const pos = textareaRef.current?.selectionStart ?? input.length; const before = input.slice(0, input.lastIndexOf("@")); setInput(before + `@${u.full_name} `); setShowAtPicker(false); } return; }
+                if (e.key === "Enter" || e.key === "Tab") {
+                  e.preventDefault();
+                  const u = filtered[atIndex];
+                  if (u) {
+                    const before = input.slice(0, input.lastIndexOf("@"));
+                    setInput(before);
+                    setShowAtPicker(false);
+                    openComposerFromMention(u);
+                  }
+                  return;
+                }
                 if (e.key === "Escape") { setShowAtPicker(false); return; }
               }
               if (showHashPicker) {
                 const filtered = HASH_ACTIONS.filter((a) => a.label.toLowerCase().includes(hashQuery) || a.id.includes(hashQuery));
                 if (e.key === "ArrowDown") { e.preventDefault(); setHashIndex((i) => Math.min(i + 1, filtered.length - 1)); return; }
                 if (e.key === "ArrowUp") { e.preventDefault(); setHashIndex((i) => Math.max(i - 1, 0)); return; }
-                if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); const a = filtered[hashIndex]; if (a) { const before = input.slice(0, input.lastIndexOf("#")); setInput(before + `#${a.label} `); setShowHashPicker(false); } return; }
+                if (e.key === "Enter" || e.key === "Tab") {
+                  e.preventDefault();
+                  const a = filtered[hashIndex];
+                  if (a) {
+                    const before = input.slice(0, input.lastIndexOf("#"));
+                    setInput(before);
+                    setShowHashPicker(false);
+                    openComposerFromHash(a.id);
+                  }
+                  return;
+                }
                 if (e.key === "Escape") { setShowHashPicker(false); return; }
               }
               if (e.key === "Enter" && !e.shiftKey) {
@@ -814,7 +861,7 @@ export function ChatPanel() {
           {showAtPicker && (
             <div className="absolute bottom-full left-0 mb-1 w-56 max-h-40 overflow-y-auto rounded-lg border border-slate-200 dark:border-zinc-600 bg-white dark:bg-zinc-900 shadow-xl py-1 z-50">
               {mentionUsers.filter((u) => (u.full_name || "").toLowerCase().includes(atQuery)).slice(0, 8).map((u, i) => (
-                <button key={u.id} type="button" onClick={() => { const before = input.slice(0, input.lastIndexOf("@")); setInput(before + `@${u.full_name} `); setShowAtPicker(false); textareaRef.current?.focus(); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-zinc-700 ${i === atIndex ? "bg-slate-100 dark:bg-zinc-700" : ""} text-slate-900 dark:text-slate-100`}>
+                <button key={u.id} type="button" onClick={() => { const before = input.slice(0, input.lastIndexOf("@")); setInput(before); setShowAtPicker(false); openComposerFromMention(u); textareaRef.current?.focus(); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-zinc-700 ${i === atIndex ? "bg-slate-100 dark:bg-zinc-700" : ""} text-slate-900 dark:text-slate-100`}>
                   {u.full_name || "Unknown"}
                 </button>
               ))}
@@ -824,7 +871,7 @@ export function ChatPanel() {
           {showHashPicker && (
             <div className="absolute bottom-full left-0 mb-1 w-56 max-h-40 overflow-y-auto rounded-lg border border-slate-200 dark:border-zinc-600 bg-white dark:bg-zinc-900 shadow-xl py-1 z-50">
               {HASH_ACTIONS.filter((a) => a.label.toLowerCase().includes(hashQuery) || a.id.includes(hashQuery)).map((a, i) => (
-                <button key={a.id} type="button" onClick={() => { const before = input.slice(0, input.lastIndexOf("#")); setInput(before + `#${a.label} `); setShowHashPicker(false); textareaRef.current?.focus(); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-zinc-700 flex items-center gap-2 ${i === hashIndex ? "bg-slate-100 dark:bg-zinc-700" : ""} text-slate-900 dark:text-slate-100`}>
+                <button key={a.id} type="button" onClick={() => { const before = input.slice(0, input.lastIndexOf("#")); setInput(before); setShowHashPicker(false); openComposerFromHash(a.id); textareaRef.current?.focus(); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-zinc-700 flex items-center gap-2 ${i === hashIndex ? "bg-slate-100 dark:bg-zinc-700" : ""} text-slate-900 dark:text-slate-100`}>
                   <span>{a.icon}</span> {a.label}
                 </button>
               ))}
@@ -846,6 +893,12 @@ export function ChatPanel() {
         </div>
       </div>
       </div>
+      <NewMessageComposer
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        initialChannel={composerChannel}
+        initialRecipient={composerRecipient}
+      />
     </div>
   );
 }
