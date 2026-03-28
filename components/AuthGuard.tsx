@@ -17,9 +17,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         return;
       }
       void Promise.resolve(
-        supabase.from("profiles").select("role, approved_at").eq("id", session.user.id).single()
+        supabase.from("profiles").select("role, approved_at, account_disabled").eq("id", session.user.id).single()
       )
-        .then(({ data }) => {
+        .then(async ({ data }) => {
+          if (data?.account_disabled) {
+            await supabase.auth.signOut();
+            router.replace("/login?reason=disabled");
+            return;
+          }
           const role = data?.role;
           const approved = !!data?.approved_at;
           const needsApproval = (role === "csr_admin" || role === "management_admin") && !approved;

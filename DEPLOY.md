@@ -49,7 +49,15 @@ Or run migrations via GitHub Actions (Push Supabase Migrations workflow) or loca
 
 **Support call queue (CSR pickup):** Apply `supabase/migrations/20240327120022_support_call_queue.sql` (then optional `supabase/record_migrations_022_support_queue.sql`). Enables `support_call_queue` + RLS + Realtime for Companion queue updates.
 
-**AI Gateway (voice):** In `ai-gateway/.env`, set `LIVEKIT_AGENT_NAME` to the exact LiveKit Cloud agent name (e.g. `Kloudy`). For allowlisted outbound SIP to UFC lines, set `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` and optionally `OUTBOUND_DIAL_ALLOWLIST` (defaults include `+18334326588` and `+18005252395`).
+**AI Gateway (voice):** In `ai-gateway/.env`, set `LIVEKIT_AGENT_NAME` to the exact LiveKit Cloud agent name (e.g. `Kloudy`). For allowlisted outbound SIP to UFC lines, set `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` and optionally `OUTBOUND_DIAL_ALLOWLIST` (defaults include `+18334326588` and `+18005252395`). Optional Nevada Medicaid / Gainwell-style line: set `NEVADA_MEDICAID_OUTBOUND_E164` (and optional `NEVADA_MEDICAID_SIP_DTMF`); the `nv_medicaid` preset appears in CSR dial UIs.
+
+**Interview / eligibility call logs:** Apply `supabase/migrations/20240328120030_interview_logs_account_disabled.sql`. Adds `interview_call_logs`, `profiles.account_disabled`, and `developer_allowlist`. Gateway: `POST` / `GET /api/interview-logs`, `POST /api/interview-logs/summarize` (log author only; summarizes `raw_notes` via Ollama without inventing facts).
+
+**Developer console:** Self-hosted Next on port **7888**: from `UnitedFamilyCaregivers`, run `npm run dev:developer`, open `/developer` (same app; CORS for `localhost:7888` is allowed on the gateway). Set `DEVELOPER_ALLOW_EMAILS` on the gateway and/or add rows to `developer_allowlist` using `SUPABASE_SERVICE_ROLE_KEY`. Profile approve/disable uses the service role on `/api/dev/*`. Static GitHub Pages builds still include the `/developer` page shell; sensitive actions remain on the gateway.
+
+## Developer console and optional Caddy :7888
+
+For HTTPS in front of the dev Next instance, add a Caddy site (see comments in the repo root `Caddyfile`) that `reverse_proxy`s to `localhost:7888`. The main app can stay on `7503`; the tunnel or VPS continues to proxy `/api/*` to AI Gateway `7501`.
 
 ### Supabase CLI on Windows (local, no git push)
 

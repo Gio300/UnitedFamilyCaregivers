@@ -9,6 +9,7 @@ import { SupervisorSidePanel } from "@/components/SupervisorSidePanel";
 import { ChatHistorySidebar } from "@/components/ChatHistorySidebar";
 import { ModeBar, MODE_DESCRIPTIONS } from "@/components/ModeBar";
 import { QuickActionsPIP } from "@/components/QuickActionsPIP";
+import { CsrCallQueuePanel } from "@/components/CsrCallQueuePanel";
 
 export function DashboardMainContent({ inlinePage }: { inlinePage?: ReactNode }) {
   const {
@@ -17,16 +18,32 @@ export function DashboardMainContent({ inlinePage }: { inlinePage?: ReactNode })
     openPIP,
     setPendingAssistantMessage,
     accentColor,
+    userRole,
   } = useApp();
+
+  const isAdmin = userRole === "csr_admin" || userRole === "management_admin";
 
   const onModeSelect = (selected: AppMode) => {
     setPendingAssistantMessage(MODE_DESCRIPTIONS[selected]);
     if (selected === "contact_us") {
       openCompanion();
     }
+    if (selected === "queue") {
+      openPIP("expand", {
+        title: "Calls in queue",
+        content: <CsrCallQueuePanel />,
+      });
+    }
     if (selected === "eligibility") {
-      openPIP("eligibility");
+      if (isAdmin) {
+        openPIP("eligibility");
+      }
       openCompanion();
+      if (!isAdmin) {
+        setPendingAssistantMessage(
+          "Eligibility (member): use Companion for a short script and approved Medicaid line. Admins use the eligibility panel for portal tools."
+        );
+      }
     }
   };
 

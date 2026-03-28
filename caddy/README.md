@@ -23,3 +23,7 @@ Or: `.\scripts\run-caddy-tunnel.ps1`
 Ensure the AI Gateway is running on port 7501, and Cloudflare tunnel points to localhost:8080.
 
 **Note:** You can skip Caddy and point the tunnel directly to 7501: `cloudflared tunnel --url http://localhost:7501`
+
+## Optional: developer Next (port 7888)
+
+Run `npm run dev:developer` in the app folder, then add a Caddy site that `reverse_proxy`s to `localhost:7888` (see repo root `Caddyfile` comments in Kloudy_Ai, or duplicate the `reverse_proxy` block from `Caddyfile.local` with the new port).

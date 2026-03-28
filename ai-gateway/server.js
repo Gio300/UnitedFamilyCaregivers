@@ -36,6 +36,8 @@ const allowedOrigins = [
   "http://127.0.0.1:7512",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
+  "http://localhost:7888",
+  "http://127.0.0.1:7888",
 ];
 app.use(cors({
   origin: (origin, cb) => {
@@ -82,9 +84,13 @@ async function requireAuth(req, res, next) {
 
 const { registerSupportQueueRoutes, isCsrUser } = require("./support-queue");
 const { registerTelephonyRoutes } = require("./telephony");
+const { registerInterviewLogRoutes } = require("./interview-logs");
+const { registerDeveloperRoutes } = require("./developer");
 if (supabaseUrl && supabaseAnonKey) {
   registerSupportQueueRoutes(app, { requireAuth, supabaseUrl, supabaseAnonKey });
   registerTelephonyRoutes(app, { requireAuth, supabaseUrl, supabaseAnonKey });
+  registerInterviewLogRoutes(app, { requireAuth, supabaseUrl, supabaseAnonKey });
+  registerDeveloperRoutes(app, { requireAuth, supabaseUrl, supabaseAnonKey });
 }
 
 app.get("/api/health", (req, res) => {
@@ -97,6 +103,10 @@ app.get("/api/health", (req, res) => {
       companionOrchestrate: true,
       supportQueue: !!(supabaseUrl && supabaseAnonKey),
       telephonyOutbound: !!(process.env.LIVEKIT_SIP_OUTBOUND_TRUNK_ID || "").trim(),
+      interviewLogs: !!(supabaseUrl && supabaseAnonKey),
+      developerConsole:
+        !!(process.env.DEVELOPER_ALLOW_EMAILS || "").trim() ||
+        !!(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim(),
     },
   });
 });

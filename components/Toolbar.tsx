@@ -150,9 +150,15 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-          {(messageCenterCount + pendingCount) > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-              {(messageCenterCount + pendingCount) > 99 ? "99+" : messageCenterCount + pendingCount}
+          {messageCenterCount > 0 && (
+            <span
+              className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-black"
+              aria-hidden
+            />
+          )}
+          {pendingCount > 0 && (
+            <span className="absolute -top-0.5 -left-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+              {pendingCount > 99 ? "99+" : pendingCount}
             </span>
           )}
         </button>

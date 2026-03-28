@@ -24,6 +24,13 @@ Use:
 | Onboarding status | GET | `/api/voice/onboarding-status` | `Authorization: Bearer <user JWT>` | Returns `{ ok, nextField, message }` stub. |
 | Onboarding draft | POST | `/api/voice/onboarding-draft` | `Authorization: Bearer <user JWT>` | JSON object of fields; returns `{ ok, received, stub }`. |
 | Companion orchestrate | POST | `/api/companion-orchestrate` | Bearer JWT | For debugging only from trusted clients; not typical for LiveKit. |
+| Support queue waiting | GET | `/api/support-queue/waiting` | Bearer JWT (CSR / supervisor) | Queue health for staff. |
+| Telephony lines | GET | `/api/telephony/lines` | Bearer JWT (CSR / supervisor) | `{ lines, configured }` — keys include optional `nv_medicaid`. |
+| Telephony outbound | POST | `/api/telephony/outbound` | Bearer JWT (CSR / supervisor) | JSON `{ "line": "ufc833" }` etc.; creates LiveKit room + SIP. |
+| Interview log insert | POST | `/api/interview-logs` | Bearer JWT | JSON `{ raw_notes, outcome?, call_type?, room_name?, structured? }`. |
+| Interview log list | GET | `/api/interview-logs` | Bearer JWT | Query `limit`; RLS applies. |
+| Interview log summarize | POST | `/api/interview-logs/summarize` | Bearer JWT | JSON `{ "id": "<uuid>" }` — author only; Ollama fills `ai_summary`. |
+| Developer status | GET | `/api/dev/status` | Bearer JWT + dev allowlist | Not for LiveKit; dev console health. |
 
 ### Example: onboarding draft
 
@@ -48,6 +55,8 @@ Map `room_name` / `participant_identity` to a user in your DB before writing dra
 ## Caddy / reverse proxy
 
 Expose the same paths as the existing gateway (`/api/*`). No extra path prefix required if `NEXT_PUBLIC_API_BASE` already points at the gateway root.
+
+Optional **developer Next** on port `7888`: run `npm run dev:developer` in `UnitedFamilyCaregivers` and add a Caddy `reverse_proxy` to `localhost:7888` for a dedicated hostname or TLS port (see root `Caddyfile` comments).
 
 ## Related app routes
 

@@ -123,6 +123,8 @@ export function ChatPanel() {
         mode: mode || undefined,
         session_id: sessionId || undefined,
         companionFlow: companionFlow ?? undefined,
+        billingReadinessFunnel:
+          "Sandata-style billing readiness: client payer row → employee → visit when relevant; one question at a time; prefer EVV checklist, profiles, message center, appointments, eligibility next step — concise, non-duplicative.",
       };
       if (companionSummary.trim()) ctx.companionSummary = companionSummary.slice(-3500);
       if (voiceCaptionTail.trim()) ctx.voiceSnippet = voiceCaptionTail.slice(-2500);
@@ -359,6 +361,7 @@ export function ChatPanel() {
     if (m === "evv") return "evv";
     if (m === "customer_service") return "customer_service";
     if (m === "eligibility") return "eligibility";
+    if (m === "queue") return "customer_service";
     if (m === "contact_us") return "general";
     return "general";
   }

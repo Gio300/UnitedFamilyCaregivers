@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PIPWindow } from "./PIPWindow";
+import { TelephonyOutboundControls } from "@/components/TelephonyOutboundControls";
 import { getApiBase } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,7 +16,9 @@ export function EligibilityPIP({ onClose }: EligibilityPIPProps) {
   const [mfaCode, setMfaCode] = useState<string>("—");
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const supabase = createClient();
+  const isStaffAdmin = userRole === "csr_admin" || userRole === "management_admin";
 
   async function fetchTotp() {
     const apiBase = getApiBase();
@@ -43,6 +46,14 @@ export function EligibilityPIP({ onClose }: EligibilityPIPProps) {
     const interval = setInterval(fetchTotp, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      setUserRole(data?.role ?? null);
+    });
+  }, [supabase]);
 
   async function openPortal() {
     const apiBase = getApiBase();
@@ -102,6 +113,16 @@ export function EligibilityPIP({ onClose }: EligibilityPIPProps) {
         >
           {portalLoading ? "Opening…" : "Open Portal (auto-login)"}
         </button>
+
+        {isStaffAdmin && (
+          <div className="pt-4 border-t border-slate-200 dark:border-zinc-600">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">CSR — dial allowlisted line</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Starts a LiveKit room with outbound SIP (Nevada Medicaid line appears when configured on the gateway).
+            </p>
+            <TelephonyOutboundControls />
+          </div>
+        )}
       </div>
     </PIPWindow>
   );

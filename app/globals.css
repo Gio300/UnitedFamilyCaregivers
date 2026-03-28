@@ -51,15 +51,43 @@ body {
   background: #475569;
 }
 
-/* Narrow viewports: slightly larger tap targets and companion/mode readability */
-body.ufci-mobile [data-ufci-modebar] button {
+/* Device layout (Settings): drives density — root font also scaled in AppContext via --ufci-device-mult */
+html[data-device="desktop"] [data-ufci-modebar] button {
+  min-height: 2.25rem;
+  font-size: 0.875rem;
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+}
+html[data-device="tablet"] [data-ufci-modebar] button {
+  min-height: 2.5rem;
+  font-size: 0.9375rem;
+}
+html[data-device="mobile"] [data-ufci-modebar] button {
   min-height: 2.75rem;
   font-size: 1rem;
 }
-body.ufci-mobile [data-ufci-companion-body] {
+
+html[data-device="desktop"] [data-ufci-companion-body] {
+  font-size: 0.875rem;
+}
+html[data-device="tablet"] [data-ufci-companion-body] {
+  font-size: 1rem;
+}
+html[data-device="mobile"] [data-ufci-companion-body] {
   font-size: 1.0625rem;
 }
-body.ufci-mobile [data-ufci-companion-body] textarea,
-body.ufci-mobile .min-h-\[42vh\] textarea {
+
+html[data-device="mobile"] [data-ufci-companion-body] textarea,
+html[data-device="mobile"] .min-h-\[42vh\] textarea {
   min-height: 3rem;
+}
+html[data-device="tablet"] [data-ufci-companion-body] textarea,
+html[data-device="tablet"] .min-h-\[42vh\] textarea {
+  min-height: 2.75rem;
+}
+
+/* Narrow physical viewport: minimum tap targets only (additive; does not replace data-device typography) */
+body.ufci-narrow-viewport header button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
 }

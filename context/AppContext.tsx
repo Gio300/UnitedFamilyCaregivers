@@ -14,7 +14,8 @@ export type AppMode =
   | "appointments"
   | "supervisor"
   | "eligibility"
-  | "contact_us";
+  | "contact_us"
+  | "queue";
 
 /** Must match `ComposerChannel` in NewMessageComposer (avoid circular import). */
 export type ComposerRequestChannel = "dm" | "email" | "reminder" | "appointment" | "call";
@@ -207,6 +208,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   chatSessionsRef.current = chatSessions;
   const scaleRef = useRef({ textScalePx: 16, pageScale: 1 });
   scaleRef.current = { textScalePx, pageScale };
+  const deviceTypeRef = useRef(deviceType);
+  deviceTypeRef.current = deviceType;
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string }[]>([]);
   const [autoNotesScope, setAutoNotesScopeState] = useState<"this_chat" | "all">("all");
@@ -341,15 +344,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTextSizeState(t);
     document.documentElement.setAttribute("data-text-size", t);
     const px = t === "small" ? 14 : t === "large" ? 18 : 16;
+    const ps = scaleRef.current.pageScale;
     document.documentElement.style.setProperty("--ufci-text-base", `${px}px`);
-    document.documentElement.style.fontSize = `${px}px`;
+    const dm =
+      deviceTypeRef.current === "mobile" ? 1.125 : deviceTypeRef.current === "tablet" ? 1.0625 : 1;
+    document.documentElement.style.setProperty("--ufci-device-mult", String(dm));
+    document.documentElement.style.fontSize = `${px * ps * dm}px`;
     localStorage.setItem("ufci_text_size", t);
   }, []);
 
   const applyFontScale = useCallback((tpx: number, ps: number) => {
+    const dm =
+      deviceTypeRef.current === "mobile" ? 1.125 : deviceTypeRef.current === "tablet" ? 1.0625 : 1;
     document.documentElement.style.setProperty("--ufci-text-base", `${tpx}px`);
     document.documentElement.style.setProperty("--ufci-scale", String(ps));
-    document.documentElement.style.fontSize = `${tpx * ps}px`;
+    document.documentElement.style.setProperty("--ufci-device-mult", String(dm));
+    document.documentElement.style.fontSize = `${tpx * ps * dm}px`;
   }, []);
 
   const setTextScalePx = useCallback((v: number) => {
@@ -378,8 +388,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute("data-device", "desktop");
     document.documentElement.setAttribute("data-text-size", "medium");
     document.documentElement.style.setProperty("--ufci-text-base", "16px");
-    document.documentElement.style.fontSize = "16px";
     document.documentElement.style.setProperty("--ufci-scale", "1");
+    document.documentElement.style.setProperty("--ufci-device-mult", "1");
+    document.documentElement.style.fontSize = "16px";
     localStorage.setItem("ufci_theme", "light");
     localStorage.setItem("ufci_accent", "emerald");
     localStorage.setItem("ufci_device", "desktop");
@@ -421,24 +432,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mq = window.matchMedia("(max-width: 767px)");
-    const syncMobileClass = () => {
-      document.body.classList.toggle("ufci-mobile", mq.matches);
+    const syncNarrow = () => {
+      document.body.classList.toggle("ufci-narrow-viewport", mq.matches);
     };
-    syncMobileClass();
-    mq.addEventListener("change", syncMobileClass);
+    syncNarrow();
+    mq.addEventListener("change", syncNarrow);
     return () => {
-      mq.removeEventListener("change", syncMobileClass);
-      document.body.classList.remove("ufci-mobile");
+      mq.removeEventListener("change", syncNarrow);
+      document.body.classList.remove("ufci-narrow-viewport");
     };
   }, []);
 
   useEffect(() => {
-    const tpx = Math.min(24, Math.max(12, parseInt(localStorage.getItem("ufci_text_scale_px") || "16", 10) || 16));
-    const ps = Math.min(1.5, Math.max(0.75, parseFloat(localStorage.getItem("ufci_page_scale") || "1") || 1));
-    document.documentElement.style.setProperty("--ufci-text-base", `${tpx}px`);
-    document.documentElement.style.setProperty("--ufci-scale", String(ps));
-    document.documentElement.style.fontSize = `${tpx * ps}px`;
-  }, []);
+    if (typeof window === "undefined") return;
+    deviceTypeRef.current = deviceType;
+    applyFontScale(textScalePx, pageScale);
+  }, [deviceType, textScalePx, pageScale, applyFontScale]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

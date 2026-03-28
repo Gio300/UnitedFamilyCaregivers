@@ -45,7 +45,9 @@ You help with:
 2. Nevada laws, regulations, and processes (provider types, service codes, payers, EVV/billing)
 3. General questions about registration, appointments, and services
 
-Write in plain, everyday language. Be clear and direct. Avoid jargon. Stay professional but conversational.`;
+Write in plain, everyday language. Be clear and direct. Avoid jargon. Stay professional but conversational.
+
+**Billing readiness (Sandata / EVV):** When guiding setup, prefer the order **client row → employee → visit** where it applies. Ask **one** focused question at a time. Nudge concrete next steps (profiles, EVV checklist, message center, appointments, eligibility next step) instead of long repeated explanations. Do **not** invent statutes, legal workarounds, or quoted denials for Medicaid or payer calls; if someone describes a denial, encourage accurate notes for appeals without presenting legal advice.`;
 
 const MODE_PROMPTS = {
   chat: "General chat mode.",
@@ -56,14 +58,19 @@ const MODE_PROMPTS = {
   customer_service: "User is in Customer Service mode. Help with client management, eligibility, documents, onboarding, encounters, medications, allergies, and notes. Use list_clients, list_encounters, list_medications, list_allergies, create_appointment, add_medication, add_allergy as needed. **start checklist** runs Sandata-shaped intake prompts.",
   appointments: "User is in Appointments mode. Help schedule and manage appointments. Use create_appointment (client_id, title, start_at, duration_minutes, notes) and list_appointments (client_id) to manage the schedule.",
   supervisor: "User is in Supervisor mode. Help with approvals, oversight, and team management.",
-  eligibility: "User is in Eligibility mode. Help check Nevada Medicaid eligibility. For 'Check eligibility for @Name', you need lastName, firstName, dob, and either recipientId or ssn. The system can run automated eligibility checks. **start checklist** connects eligibility to Sandata payer row reminders.",
+  queue:
+    "User is in Queue mode (staff). Help manage the support voice queue and allowlisted outbound calls. Prefer the queue panel, accepting waiting callers, and documented eligibility/Medicaid call notes when relevant.",
+  eligibility:
+    "User is in Eligibility mode. Help check Nevada Medicaid eligibility. For 'Check eligibility for @Name', you need lastName, firstName, dob, and either recipientId or ssn. The system can run automated eligibility checks. **start checklist** connects eligibility to Sandata payer row reminders. For caregiver/client users, keep steps short: portal or guided call, one question at a time; do not invent legal strategies for payer interviews.",
 };
 
 const ROLE_PROMPTS = {
   client: "User is a client. Help with general questions, appointments, services, and their own care information.",
   caregiver: "User is a caregiver. Help with call notes, activity summaries, DMs, calls, emails, EVV visit verification, and client care. Use @ for users, # for actions (dm, email, reminder, appointment, call).",
-  csr_admin: "User is CSR/admin. Help with client management, eligibility, documents, onboarding, encounters, medications, allergies, notes, and appointments. Use list_clients, list_encounters, list_medications, list_allergies, create_appointment, add_medication, add_allergy as needed. For eligibility, use the eligibility tools.",
-  management_admin: "User is management/supervisor. Help with approvals, oversight, team management, plus all CSR capabilities. Use list_clients, create_appointment, eligibility tools, and supervisor functions.",
+  csr_admin:
+    "User is CSR/admin. Help with client management, eligibility, documents, onboarding, encounters, medications, allergies, notes, and appointments. Use list_clients, list_encounters, list_medications, list_allergies, create_appointment, add_medication, add_allergy as needed. For eligibility, use the eligibility tools. Prefer funneling toward billing readiness: EVV checklist, active client row, message center follow-ups, appointments — short and sequential.",
+  management_admin:
+    "User is management/supervisor. Help with approvals, oversight, team management, plus all CSR capabilities. Use list_clients, create_appointment, eligibility tools, and supervisor functions. Same billing-readiness funnel as CSR when coaching staff.",
 };
 
 function buildSystemPrompt(userContext) {
@@ -407,6 +414,8 @@ async function generateCompanionGuidance(contextPayload) {
 
 const COMPANION_ORCHESTRATE_SYSTEM = `You plan Companion sidebar hints for United Family Caregivers (caregiving app). Main chat runs tools; Companion only suggests next steps — do not duplicate long answers from chat.
 
+Funnel toward **billing readiness** when relevant: EVV checklist (Sandata order: client → employee → visit), profiles/client row, message center or DMs, appointments, eligibility next step. Keep guidance short and non-repetitive with the last chat turn.
+
 Return ONLY valid JSON (no markdown):
 {"guidance":"string","actions":[{"id":"snake_id","label":"short button label","chatPayload":"optional","channel":null}],"needsMcp":false,"mcpMessage":null}
 
@@ -437,7 +446,12 @@ function normalizeOrchestrateActions(raw) {
 }
 
 async function generateCompanionOrchestrate(contextPayload) {
-  const userContent = `Context JSON:\n${JSON.stringify(contextPayload)}\n\nReturn JSON only.`;
+  const role = contextPayload && contextPayload.role;
+  const adminStaff =
+    role === "csr_admin" || role === "management_admin"
+      ? " Staff user (CSR/supervisor): prefer actions using DMs, email, reminder, appointment, or chatPayload that opens workflows — not \"Contact us\". Nudge Message Center (bell) and Queue mode for live callers when relevant."
+      : "";
+  const userContent = `Context JSON:\n${JSON.stringify(contextPayload)}${adminStaff}\n\nReturn JSON only.`;
   const model = await getResolvedFastModel();
   const messages = [
     { role: "system", content: COMPANION_ORCHESTRATE_SYSTEM },
@@ -522,6 +536,34 @@ Plain guidance, max 3 sentences. Actions: 0-4 items.`;
   }
 }
 
+async function summarizeInterviewRawNotes(rawNotes) {
+  const clipped = String(rawNotes || "").trim().slice(0, 12000);
+  if (!clipped) return "";
+  const system = `You write short internal summaries of caregiver or staff phone-call notes for a home care agency.
+Rules:
+- Use ONLY information in the provided notes. Do not invent quotes, laws, statutes, or denial reasons not stated above.
+- If the notes are vague, say so briefly.
+- At most 5 sentences. Plain text only — no markdown, no bullet lists.`;
+  const userContent = `Notes:\n\n${clipped}\n\nSummary:`;
+  const messages = [
+    { role: "system", content: system },
+    { role: "user", content: userContent },
+  ];
+  const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: MODEL_SMART, messages, stream: false }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Ollama error: ${response.status} ${err}`);
+  }
+  const data = await response.json();
+  return String(data.message?.content || "")
+    .trim()
+    .slice(0, 4000);
+}
+
 module.exports = {
   generate,
   generateStream,
@@ -533,6 +575,7 @@ module.exports = {
   generateCompanionOrchestrate,
   refineCompanionAfterMcp,
   flowAssist,
+  summarizeInterviewRawNotes,
   MODEL_FAST,
   MODEL_SMART,
 };
