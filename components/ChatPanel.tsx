@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Group, Panel, Separator } from "react-resizable-panels";
 import { createClient } from "@/lib/supabase/client";
 import { getApiBase } from "@/lib/api";
 import { useApp, type AppMode, type ChatQuickReply, type ComposerPrefill } from "@/context/AppContext";
@@ -734,7 +735,21 @@ export function ChatPanel() {
           </button>
         </div>
       )}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-scroll p-4 space-y-3 relative">
+      <Group
+        orientation="vertical"
+        id="ufci-chat-vertical"
+        className="flex min-h-0 flex-1 flex-col"
+        defaultLayout={{ "ufci-chat-messages": 66, "ufci-chat-composer": 34 }}
+      >
+        <Panel
+          id="ufci-chat-messages"
+          defaultSize="66%"
+          minSize="38%"
+          maxSize="82%"
+          className="flex min-h-0 flex-col"
+          groupResizeBehavior="preserve-relative-size"
+        >
+          <div ref={scrollContainerRef} className="relative min-h-0 flex-1 space-y-3 overflow-y-scroll p-4">
         {messages.length === 0 && (
           <p className="text-sm text-zinc-500">Send a message to start chatting.</p>
         )}
@@ -855,8 +870,11 @@ export function ChatPanel() {
             </svg>
           </button>
         )}
-      </div>
-      <div className="shrink-0 bg-white dark:bg-black border-t border-slate-200 dark:border-zinc-700 sticky bottom-0 z-[5]">
+          </div>
+        </Panel>
+        <Separator className="h-1.5 shrink-0 bg-slate-200 data-[separator=active]:bg-emerald-500/60 hover:bg-emerald-500/40 dark:bg-zinc-700 transition-colors" />
+        <Panel id="ufci-chat-composer" defaultSize="34%" minSize="18%" maxSize="62%" className="flex min-h-0 flex-col">
+      <div className="z-[5] flex min-h-0 flex-1 flex-col border-t border-slate-200 bg-white dark:border-zinc-700 dark:bg-black">
       <AutoNotesBar clientId={activeClientId} userId={currentUserId} />
       <div className="p-3 space-y-2">
         {attachments.length > 0 && (
@@ -1007,6 +1025,8 @@ export function ChatPanel() {
         </div>
       </div>
       </div>
+        </Panel>
+      </Group>
       <NewMessageComposer
         open={composerOpen}
         onClose={() => {

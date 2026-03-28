@@ -18,7 +18,9 @@ const HEURISTIC_GUIDANCE = [
   "While you wait, the voice assistant may help with simple questions. A human will still receive the notes we collect here.",
 ];
 
-export function CompanionPanel() {
+type CompanionLayout = "inline" | "sheet";
+
+export function CompanionPanel({ layout = "inline" }: { layout?: CompanionLayout }) {
   const {
     rightSidebarOpen,
     setRightSidebarOpen,
@@ -253,13 +255,18 @@ export function CompanionPanel() {
     requestComposerChannel("email");
   };
 
-  if (!rightSidebarOpen) return null;
+  if (!rightSidebarOpen && layout === "inline") return null;
 
   const canGuidanceBack = companionGuidance.index > 0;
   const canGuidanceForward = companionGuidance.index < companionGuidance.history.length - 1;
 
+  const shellClass =
+    layout === "sheet"
+      ? "flex h-full min-h-0 w-full max-h-full flex-col overflow-hidden border-0 bg-white dark:bg-zinc-900/95"
+      : "flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-slate-200 bg-white dark:border-zinc-700/50 dark:bg-zinc-900/95";
+
   return (
-    <aside className="w-full h-full min-h-0 shrink-0 max-h-[48vh] md:max-h-none border-t md:border-t-0 md:border-l border-slate-200 dark:border-zinc-700/50 bg-white dark:bg-zinc-900/95 flex flex-col">
+    <aside className={shellClass} aria-label="Companion">
       <div className="p-3 border-b border-slate-200 dark:border-zinc-700/50 shrink-0">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Companion</h3>

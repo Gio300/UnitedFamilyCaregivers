@@ -9,6 +9,7 @@ import { AppProvider } from "@/context/AppContext";
 import { Toolbar } from "@/components/Toolbar";
 import { DashboardShell } from "@/components/DashboardShell";
 import { PIPContainer } from "@/components/PIPContainer";
+import { DeviceViewportFrame } from "@/components/DeviceViewportFrame";
 
 export default function DashboardLayout({
   children,
@@ -76,30 +77,34 @@ export default function DashboardLayout({
   return (
     <AuthGuard>
       <AppProvider>
-        <div className="min-h-screen flex flex-col bg-white dark:bg-black">
-          <Toolbar onSettingsClick={() => setSettingsOpen(true)} />
-          <main className="flex-1 flex min-h-0 overflow-hidden">
-            {isPendingApprovalPage ? (
-              <div className="flex-1 overflow-auto">
-                {children}
-              </div>
-            ) : isVoiceLabPage ? (
-              <div className="flex-1 flex min-h-0 min-w-0 overflow-auto">
-                {children}
-              </div>
-            ) : (
-              <>
-                <DashboardShell
-                  inlinePage={
-                    isProfilePage ? (
-                      <div className="flex-1 overflow-auto max-w-4xl w-full mx-auto px-4 py-6">{children}</div>
-                    ) : undefined
-                  }
-                />
-                {isCustomerSupportPage ? children : null}
-              </>
-            )}
-          </main>
+        <div className="h-dvh min-h-0 flex flex-col overflow-hidden">
+          <DeviceViewportFrame>
+            <div className="flex h-full min-h-0 min-w-0 flex-col bg-white dark:bg-black">
+              <Toolbar onSettingsClick={() => setSettingsOpen(true)} />
+              <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                {isPendingApprovalPage ? (
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    {children}
+                  </div>
+                ) : isVoiceLabPage ? (
+                  <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+                    {children}
+                  </div>
+                ) : (
+                  <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                    <DashboardShell
+                      inlinePage={
+                        isProfilePage ? (
+                          <div className="mx-auto w-full max-w-4xl flex-1 overflow-auto px-4 py-6">{children}</div>
+                        ) : undefined
+                      }
+                    />
+                    {isCustomerSupportPage ? children : null}
+                  </div>
+                )}
+              </main>
+            </div>
+          </DeviceViewportFrame>
         </div>
         <PIPContainer settingsOpen={settingsOpen} onCloseSettings={() => setSettingsOpen(false)} settingsPriority={showOnboarding} />
         {showOnboarding && (

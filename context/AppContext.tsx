@@ -3,6 +3,13 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getApiBase } from "@/lib/api";
+import {
+  DEVICE_VIEWPORT_PRESETS,
+  clampViewportHeight,
+  clampViewportWidth,
+  inferDeviceLayoutFromViewportWidth,
+  type DeviceLayoutType,
+} from "@/lib/deviceViewportPresets";
 
 export type AppMode =
   | "chat"
@@ -84,12 +91,31 @@ interface AppContextValue {
   setAccentColor: (c: AccentColor) => void;
   deviceType: "desktop" | "tablet" | "mobile";
   setDeviceType: (d: "desktop" | "tablet" | "mobile") => void;
+  /** Updates device class / typography only (does not change simulated viewport size). For profile sync. */
+  setDeviceTypeTypographyOnly: (d: DeviceLayoutType) => void;
   textSize: "small" | "medium" | "large";
   setTextSize: (t: "small" | "medium" | "large") => void;
   textScalePx: number;
   setTextScalePx: (v: number) => void;
   pageScale: number;
   setPageScale: (v: number) => void;
+  /** Simulated device frame width/height (CSS px). Presets set these when changing device type. */
+  viewportWidth: number;
+  viewportHeight: number;
+  setViewportWidth: (v: number) => void;
+  setViewportHeight: (v: number) => void;
+  /** Scale frame down so it fits in the browser window without changing logical size. */
+  fitViewportToWindow: boolean;
+  setFitViewportToWindow: (v: boolean) => void;
+  /**
+   * When false (default), the dashboard fills the browser and layout width follows the real viewport.
+   * When true, a fixed pixel frame is used for QA (sliders / presets).
+   */
+  useSimulatedDeviceFrame: boolean;
+  setUseSimulatedDeviceFrame: (v: boolean) => void;
+  /** When true with simulated frame off, window resize updates device class via viewport width. */
+  deviceLayoutAuto: boolean;
+  setDeviceLayoutAuto: (v: boolean) => void;
   resetSettings: () => void;
   activeClientId: string | null;
   setActiveClientId: (id: string | null) => void;
@@ -178,6 +204,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [textSize, setTextSizeState] = useState<"small" | "medium" | "large">("medium");
   const [textScalePx, setTextScalePxState] = useState(16);
   const [pageScale, setPageScaleState] = useState(1);
+  const desktopPreset = DEVICE_VIEWPORT_PRESETS.desktop;
+  const [viewportWidth, setViewportWidthState] = useState(desktopPreset.width);
+  const [viewportHeight, setViewportHeightState] = useState(desktopPreset.height);
+  const [fitViewportToWindow, setFitViewportToWindowState] = useState(false);
+  const [useSimulatedDeviceFrame, setUseSimulatedDeviceFrameState] = useState(false);
+  const [deviceLayoutAuto, setDeviceLayoutAutoState] = useState(true);
+  const useSimFrameRef = useRef(false);
+  const deviceLayoutAutoRef = useRef(true);
   const [activeClientId, setActiveClientIdState] = useState<string | null>(null);
   const [chatResetKey, setChatResetKey] = useState(0);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
@@ -334,10 +368,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("ufci_accent", c);
   }, []);
 
-  const setDeviceType = useCallback((d: "desktop" | "tablet" | "mobile") => {
+  const setDeviceType = useCallback((d: DeviceLayoutType) => {
+    const { width, height } = DEVICE_VIEWPORT_PRESETS[d];
+    deviceTypeRef.current = d;
     setDeviceTypeState(d);
+    setViewportWidthState(width);
+    setViewportHeightState(height);
     document.documentElement.setAttribute("data-device", d);
     localStorage.setItem("ufci_device", d);
+    localStorage.setItem("ufci_viewport_w", String(width));
+    localStorage.setItem("ufci_viewport_h", String(height));
+  }, []);
+
+  const setViewportWidth = useCallback((v: number) => {
+    const c = clampViewportWidth(v);
+    setViewportWidthState(c);
+    localStorage.setItem("ufci_viewport_w", String(c));
+  }, []);
+
+  const setViewportHeight = useCallback((v: number) => {
+    const c = clampViewportHeight(v);
+    setViewportHeightState(c);
+    localStorage.setItem("ufci_viewport_h", String(c));
+  }, []);
+
+  const setFitViewportToWindow = useCallback((v: boolean) => {
+    setFitViewportToWindowState(v);
+    localStorage.setItem("ufci_fit_viewport", v ? "1" : "0");
   }, []);
 
   const setTextSize = useCallback((t: "small" | "medium" | "large") => {
@@ -376,16 +433,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("ufci_page_scale", String(v));
   }, [applyFontScale]);
 
+  const setDeviceTypeTypographyOnly = useCallback(
+    (d: DeviceLayoutType) => {
+      deviceTypeRef.current = d;
+      setDeviceTypeState(d);
+      document.documentElement.setAttribute("data-device", d);
+      localStorage.setItem("ufci_device", d);
+      const tpx = scaleRef.current.textScalePx;
+      const ps = scaleRef.current.pageScale;
+      applyFontScale(tpx, ps);
+    },
+    [applyFontScale]
+  );
+
+  const setUseSimulatedDeviceFrame = useCallback(
+    (v: boolean) => {
+      setUseSimulatedDeviceFrameState(v);
+      localStorage.setItem("ufci_sim_frame", v ? "1" : "0");
+      if (v) {
+        const d = deviceTypeRef.current;
+        const { width, height } = DEVICE_VIEWPORT_PRESETS[d];
+        setViewportWidthState(width);
+        setViewportHeightState(height);
+        localStorage.setItem("ufci_viewport_w", String(width));
+        localStorage.setItem("ufci_viewport_h", String(height));
+      } else if (typeof window !== "undefined" && deviceLayoutAutoRef.current) {
+        const inferred = inferDeviceLayoutFromViewportWidth(window.innerWidth);
+        setDeviceTypeTypographyOnly(inferred);
+      }
+    },
+    [setDeviceTypeTypographyOnly]
+  );
+
+  const setDeviceLayoutAuto = useCallback(
+    (v: boolean) => {
+      setDeviceLayoutAutoState(v);
+      localStorage.setItem("ufci_device_auto", v ? "1" : "0");
+      if (v && typeof window !== "undefined" && !useSimFrameRef.current) {
+        const inferred = inferDeviceLayoutFromViewportWidth(window.innerWidth);
+        setDeviceTypeTypographyOnly(inferred);
+      }
+    },
+    [setDeviceTypeTypographyOnly]
+  );
+
   const resetSettings = useCallback(() => {
+    const { width, height } = DEVICE_VIEWPORT_PRESETS.desktop;
+    const inferredDevice =
+      typeof window !== "undefined" ? inferDeviceLayoutFromViewportWidth(window.innerWidth) : "desktop";
+    setUseSimulatedDeviceFrameState(false);
+    setDeviceLayoutAutoState(true);
     setThemeState("light");
     setAccentColorState("emerald");
-    setDeviceTypeState("desktop");
+    deviceTypeRef.current = inferredDevice;
+    setDeviceTypeState(inferredDevice);
     setTextSizeState("medium");
     setTextScalePxState(16);
     setPageScaleState(1);
+    setViewportWidthState(width);
+    setViewportHeightState(height);
+    setFitViewportToWindowState(false);
     document.documentElement.classList.remove("dark");
     document.documentElement.setAttribute("data-accent", "emerald");
-    document.documentElement.setAttribute("data-device", "desktop");
+    document.documentElement.setAttribute("data-device", inferredDevice);
     document.documentElement.setAttribute("data-text-size", "medium");
     document.documentElement.style.setProperty("--ufci-text-base", "16px");
     document.documentElement.style.setProperty("--ufci-scale", "1");
@@ -393,11 +503,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.fontSize = "16px";
     localStorage.setItem("ufci_theme", "light");
     localStorage.setItem("ufci_accent", "emerald");
-    localStorage.setItem("ufci_device", "desktop");
+    localStorage.setItem("ufci_device", inferredDevice);
+    localStorage.setItem("ufci_sim_frame", "0");
+    localStorage.setItem("ufci_device_auto", "1");
     localStorage.setItem("ufci_text_size", "medium");
     localStorage.setItem("ufci_text_scale_px", "16");
     localStorage.setItem("ufci_page_scale", "1");
-    localStorage.setItem("ufci_settings", JSON.stringify({ deviceType: "desktop", textSize: "medium", textScalePx: 16, pageScale: 1 }));
+    localStorage.setItem("ufci_viewport_w", String(width));
+    localStorage.setItem("ufci_viewport_h", String(height));
+    localStorage.setItem("ufci_fit_viewport", "0");
+    localStorage.setItem(
+      "ufci_settings",
+      JSON.stringify({
+        deviceType: inferredDevice,
+        textSize: "medium",
+        textScalePx: 16,
+        pageScale: 1,
+        viewportWidth: width,
+        viewportHeight: height,
+        fitViewportToWindow: false,
+        useSimulatedDeviceFrame: false,
+        deviceLayoutAuto: true,
+      })
+    );
   }, []);
 
   const resetChat = useCallback(() => {
@@ -408,7 +536,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const t = (localStorage.getItem("ufci_theme") as Theme) || "light";
     const c = (localStorage.getItem("ufci_accent") as AccentColor) || "emerald";
-    let d: "desktop" | "tablet" | "mobile" = "desktop";
+    let d: DeviceLayoutType = "desktop";
     const stored = localStorage.getItem("ufci_device") || localStorage.getItem("ufci_settings");
     if (stored) {
       try {
@@ -421,27 +549,96 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const ts = (localStorage.getItem("ufci_text_size") || "medium") as "small" | "medium" | "large";
     const tpx = parseInt(localStorage.getItem("ufci_text_scale_px") || "16", 10) || 16;
     const ps = parseFloat(localStorage.getItem("ufci_page_scale") || "1") || 1;
+    let vw = parseInt(localStorage.getItem("ufci_viewport_w") || "", 10);
+    let vh = parseInt(localStorage.getItem("ufci_viewport_h") || "", 10);
+    const fitRaw = localStorage.getItem("ufci_fit_viewport");
+    let fit = fitRaw === "1";
+    let simFrame = localStorage.getItem("ufci_sim_frame") === "1";
+    let devAuto = localStorage.getItem("ufci_device_auto") !== "0";
+    try {
+      const bag = localStorage.getItem("ufci_settings");
+      if (bag?.startsWith("{")) {
+        const parsed = JSON.parse(bag) as {
+          viewportWidth?: number;
+          viewportHeight?: number;
+          fitViewportToWindow?: boolean;
+          useSimulatedDeviceFrame?: boolean;
+          deviceLayoutAuto?: boolean;
+        };
+        if (parsed.viewportWidth != null && Number.isFinite(parsed.viewportWidth)) vw = parsed.viewportWidth;
+        if (parsed.viewportHeight != null && Number.isFinite(parsed.viewportHeight)) vh = parsed.viewportHeight;
+        if (typeof parsed.fitViewportToWindow === "boolean") fit = parsed.fitViewportToWindow;
+        if (typeof parsed.useSimulatedDeviceFrame === "boolean") simFrame = parsed.useSimulatedDeviceFrame;
+        if (typeof parsed.deviceLayoutAuto === "boolean") devAuto = parsed.deviceLayoutAuto;
+      }
+    } catch {
+      /* keep parsed from dedicated keys */
+    }
+    if (typeof window !== "undefined" && !simFrame && devAuto) {
+      d = inferDeviceLayoutFromViewportWidth(window.innerWidth);
+    }
+    if (!Number.isFinite(vw) || vw <= 0) {
+      vw = DEVICE_VIEWPORT_PRESETS[d].width;
+    }
+    if (!Number.isFinite(vh) || vh <= 0) {
+      vh = DEVICE_VIEWPORT_PRESETS[d].height;
+    }
+    deviceTypeRef.current = d;
     setTheme(t);
     setAccentColor(c);
-    setDeviceType(d);
+    setDeviceTypeState(d);
+    document.documentElement.setAttribute("data-device", d);
     setTextSize(ts);
     setTextScalePxState(Math.min(24, Math.max(12, tpx)));
     setPageScaleState(Math.min(1.5, Math.max(0.75, ps)));
-  }, [setTheme, setAccentColor, setDeviceType, setTextSize]);
+    setViewportWidthState(clampViewportWidth(vw));
+    setViewportHeightState(clampViewportHeight(vh));
+    setFitViewportToWindowState(fit);
+    setUseSimulatedDeviceFrameState(simFrame);
+    setDeviceLayoutAutoState(devAuto);
+  }, [setTheme, setAccentColor, setTextSize]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mq = window.matchMedia("(max-width: 767px)");
     const syncNarrow = () => {
-      document.body.classList.toggle("ufci-narrow-viewport", mq.matches);
+      const w = useSimulatedDeviceFrame ? viewportWidth : window.innerWidth;
+      document.body.classList.toggle("ufci-narrow-viewport", mq.matches || w < 768);
     };
     syncNarrow();
     mq.addEventListener("change", syncNarrow);
+    window.addEventListener("resize", syncNarrow);
     return () => {
       mq.removeEventListener("change", syncNarrow);
+      window.removeEventListener("resize", syncNarrow);
       document.body.classList.remove("ufci-narrow-viewport");
     };
-  }, []);
+  }, [viewportWidth, useSimulatedDeviceFrame]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (useSimulatedDeviceFrame || !deviceLayoutAuto) return;
+    let tid: ReturnType<typeof setTimeout>;
+    const onResize = () => {
+      clearTimeout(tid);
+      tid = setTimeout(() => {
+        const inferred = inferDeviceLayoutFromViewportWidth(window.innerWidth);
+        if (inferred !== deviceTypeRef.current) {
+          setDeviceTypeTypographyOnly(inferred);
+        }
+      }, 200);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      clearTimeout(tid);
+    };
+  }, [useSimulatedDeviceFrame, deviceLayoutAuto, setDeviceTypeTypographyOnly]);
+
+  useEffect(() => {
+    useSimFrameRef.current = useSimulatedDeviceFrame;
+    deviceLayoutAutoRef.current = deviceLayoutAuto;
+  }, [useSimulatedDeviceFrame, deviceLayoutAuto]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -756,12 +953,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAccentColor,
         deviceType,
         setDeviceType,
+        setDeviceTypeTypographyOnly,
         textSize,
         setTextSize,
         textScalePx,
         setTextScalePx,
         pageScale,
         setPageScale,
+        viewportWidth,
+        viewportHeight,
+        setViewportWidth,
+        setViewportHeight,
+        fitViewportToWindow,
+        setFitViewportToWindow,
+        useSimulatedDeviceFrame,
+        setUseSimulatedDeviceFrame,
+        deviceLayoutAuto,
+        setDeviceLayoutAuto,
         resetSettings,
         activeClientId,
         setActiveClientId,

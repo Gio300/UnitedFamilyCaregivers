@@ -6,14 +6,14 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { CustomerServiceSidePanel } from "@/components/CustomerServiceSidePanel";
 import { EligibilitySidePanel } from "@/components/EligibilitySidePanel";
 import { SupervisorSidePanel } from "@/components/SupervisorSidePanel";
-import { ChatHistorySidebar } from "@/components/ChatHistorySidebar";
 import { ModeBar, MODE_DESCRIPTIONS } from "@/components/ModeBar";
 import { QuickActionsPIP } from "@/components/QuickActionsPIP";
 import { CsrCallQueuePanel } from "@/components/CsrCallQueuePanel";
+import { useSimulatedViewport } from "@/components/DeviceViewportFrame";
 
 export function DashboardMainContent({ inlinePage }: { inlinePage?: ReactNode }) {
+  const { innerWidth } = useSimulatedViewport();
   const {
-    leftSidebarOpen,
     openCompanion,
     openPIP,
     setPendingAssistantMessage,
@@ -49,10 +49,9 @@ export function DashboardMainContent({ inlinePage }: { inlinePage?: ReactNode })
 
   return (
     <>
-      {leftSidebarOpen && <ChatHistorySidebar />}
-      <div className="flex-1 flex min-h-0 min-w-0 min-h-0">
+      <div className="flex min-h-0 min-w-0 flex-1">
         <div
-          className="flex-1 flex flex-col min-h-0 min-w-0 p-2 sm:p-4 gap-2"
+          className={`flex-1 flex flex-col min-h-0 min-w-0 gap-2 ${innerWidth >= 640 ? "p-4" : "p-2"}`}
           data-onboarding-chat
         >
           <div className="shrink-0 -mx-0.5 px-0.5 pb-2 border-b border-slate-200 dark:border-zinc-700">
@@ -87,7 +86,9 @@ export function DashboardMainContent({ inlinePage }: { inlinePage?: ReactNode })
               </button>
             </div>
           </div>
-          <div className="flex-1 flex flex-col min-h-0 min-w-0 min-h-[42vh] md:min-h-0">
+          <div
+            className={`flex-1 flex flex-col min-h-0 min-w-0 ${innerWidth >= 768 ? "min-h-0" : "min-h-[42vh]"}`}
+          >
             {inlinePage ?? <ChatPanel />}
           </div>
         </div>

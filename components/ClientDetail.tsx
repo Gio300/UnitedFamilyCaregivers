@@ -10,7 +10,7 @@ interface ClientDetailProps {
 }
 
 export function ClientDetail({ clientId, onBack }: ClientDetailProps) {
-  const { userRole, openPIP } = useApp();
+  const { userRole, openPIP, openCompanion } = useApp();
   const [client, setClient] = useState<{
     full_name: string;
     dob: string | null;
@@ -120,7 +120,10 @@ export function ClientDetail({ clientId, onBack }: ClientDetailProps) {
           <p className="text-slate-500 dark:text-slate-400 mb-2">Check via medicaid.nv.gov. Use chat: &quot;Check eligibility for @{client.full_name}&quot; with DOB and recipient ID.</p>
           <button
             type="button"
-            onClick={() => openPIP("eligibility")}
+            onClick={() => {
+              openPIP("eligibility");
+              openCompanion();
+            }}
             className="py-1.5 px-3 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
           >
             Open Eligibility

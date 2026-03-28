@@ -19,7 +19,7 @@ interface AutoNotesBarProps {
 }
 
 export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
-  const { openPIP, autoNotesScope, setAutoNotesScope, currentSessionId } = useApp();
+  const { openPIP, autoNotesScope, setAutoNotesScope, currentSessionId, activityLogRefreshKey } = useApp();
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -50,7 +50,7 @@ export function AutoNotesBar({ clientId, userId }: AutoNotesBarProps) {
       q = q.eq("session_id", currentSessionId);
     }
     q.then(({ data }) => setItems(data || []));
-  }, [targetId, clientId, supabase, autoNotesScope, currentSessionId]);
+  }, [targetId, clientId, supabase, autoNotesScope, currentSessionId, activityLogRefreshKey]);
 
   const handleReview = () => {
     openPIP("activity", {

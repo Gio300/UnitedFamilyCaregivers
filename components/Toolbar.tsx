@@ -124,7 +124,7 @@ export function Toolbar({ onSettingsClick }: ToolbarProps) {
       </div>
 
       {/* Right: Profiles panel, Settings, User */}
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <button
           type="button"
           onClick={() => (rightSidebarOpen ? setRightSidebarOpen(false) : openCompanion())}
