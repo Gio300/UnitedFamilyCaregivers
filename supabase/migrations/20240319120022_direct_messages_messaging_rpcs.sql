@@ -67,21 +67,8 @@ CREATE TRIGGER tr_direct_messages_thread
 
 ALTER TABLE public.direct_messages ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "direct_messages_select" ON public.direct_messages;
-CREATE POLICY "direct_messages_select" ON public.direct_messages
-  FOR SELECT USING (from_user_id = auth.uid() OR to_user_id = auth.uid());
-
-DROP POLICY IF EXISTS "direct_messages_insert" ON public.direct_messages;
-CREATE POLICY "direct_messages_insert" ON public.direct_messages
-  FOR INSERT WITH CHECK (
-    from_user_id = auth.uid()
-    AND public.is_allowed_dm_recipient(to_user_id)
-  );
-
-GRANT SELECT, INSERT ON public.direct_messages TO authenticated;
-
 -- -----------------------------------------------------------------------------
--- is_allowed_dm_recipient: admins any user; others only prior contact graph
+-- is_allowed_dm_recipient MUST exist before policies reference it (Postgres validates at CREATE POLICY).
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.is_allowed_dm_recipient(target_user uuid)
 RETURNS boolean
@@ -118,6 +105,19 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.is_allowed_dm_recipient(uuid) TO authenticated, service_role;
+
+DROP POLICY IF EXISTS "direct_messages_select" ON public.direct_messages;
+CREATE POLICY "direct_messages_select" ON public.direct_messages
+  FOR SELECT USING (from_user_id = auth.uid() OR to_user_id = auth.uid());
+
+DROP POLICY IF EXISTS "direct_messages_insert" ON public.direct_messages;
+CREATE POLICY "direct_messages_insert" ON public.direct_messages
+  FOR INSERT WITH CHECK (
+    from_user_id = auth.uid()
+    AND public.is_allowed_dm_recipient(to_user_id)
+  );
+
+GRANT SELECT, INSERT ON public.direct_messages TO authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Admin search (profiles + auth email)
