@@ -50,3 +50,16 @@ body {
 .dark .overflow-y-scroll::-webkit-scrollbar-thumb {
   background: #475569;
 }
+
+/* Narrow viewports: slightly larger tap targets and companion/mode readability */
+body.ufci-mobile [data-ufci-modebar] button {
+  min-height: 2.75rem;
+  font-size: 1rem;
+}
+body.ufci-mobile [data-ufci-companion-body] {
+  font-size: 1.0625rem;
+}
+body.ufci-mobile [data-ufci-companion-body] textarea,
+body.ufci-mobile .min-h-\[42vh\] textarea {
+  min-height: 3rem;
+}

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getApiBase } from "@/lib/api";
-import { useApp, type AppMode, type ChatQuickReply } from "@/context/AppContext";
+import { useApp, type AppMode, type ChatQuickReply, type ComposerPrefill } from "@/context/AppContext";
 import { AutoNotesBar } from "@/components/AutoNotesBar";
 import { NewMessageComposer, type ComposerChannel, type ComposerRecipient } from "@/components/NewMessageComposer";
+import { CsrCallQueuePanel } from "@/components/CsrCallQueuePanel";
 
 const HASH_TO_COMPOSER: Record<string, ComposerChannel> = {
   dm: "dm",
@@ -14,6 +15,23 @@ const HASH_TO_COMPOSER: Record<string, ComposerChannel> = {
   appointment: "appointment",
   call: "call",
 };
+
+function messageOpensCompanionContact(text: string): boolean {
+  const t = text.trim().toLowerCase().replace(/\s+/g, " ");
+  if (t.includes("#contact")) return true;
+  const needles = [
+    "call support",
+    "talk to someone",
+    "talk to a person",
+    "speak to support",
+    "live support",
+    "human agent",
+    "real person",
+    "phone support",
+    "voice support",
+  ];
+  return needles.some((n) => t.includes(n));
+}
 
 interface Message {
   role: "user" | "assistant";
@@ -33,7 +51,38 @@ type StoredFlowContext = {
 };
 
 export function ChatPanel() {
-  const { userRole, openPIP, chatResetKey, accentColor, addChatSession, updateChatSession, loadChatSession, currentSessionId, openChatSession, pendingAttachments, setPendingAttachments, activeClientId, setActiveClientId, mode, pendingAssistantMessage, setPendingAssistantMessage, resetChat } = useApp();
+  const {
+    userRole,
+    openPIP,
+    openCompanion,
+    appendCompanionNote,
+    chatResetKey,
+    accentColor,
+    addChatSession,
+    updateChatSession,
+    loadChatSession,
+    currentSessionId,
+    openChatSession,
+    pendingAttachments,
+    setPendingAttachments,
+    activeClientId,
+    setActiveClientId,
+    mode,
+    pendingAssistantMessage,
+    setPendingAssistantMessage,
+    resetChat,
+    companionFlow,
+    companionSummary,
+    voiceCaptionTail,
+    companionDecisions,
+    queueAgentAvailable,
+    ivrSessionUnresolved,
+    composerRequest,
+    clearComposerRequest,
+    pendingUserComposerText,
+    setPendingUserComposerText,
+    setLastChatSnippetForCompanion,
+  } = useApp();
   const [activeClientName, setActiveClientName] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
@@ -60,10 +109,48 @@ export function ChatPanel() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerChannel, setComposerChannel] = useState<ComposerChannel>("dm");
   const [composerRecipient, setComposerRecipient] = useState<ComposerRecipient | null>(null);
+  const [composerPrefill, setComposerPrefill] = useState<ComposerPrefill | null>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+  const isAdmin = userRole === "csr_admin" || userRole === "management_admin";
+
+  const buildChatUserContext = useCallback(
+    (sessionId: string | null | undefined) => {
+      const ctx: Record<string, unknown> = {
+        role: userRole || undefined,
+        activeClientId: activeClientId || undefined,
+        activeClientName: activeClientName || undefined,
+        mode: mode || undefined,
+        session_id: sessionId || undefined,
+        companionFlow: companionFlow ?? undefined,
+      };
+      if (companionSummary.trim()) ctx.companionSummary = companionSummary.slice(-3500);
+      if (voiceCaptionTail.trim()) ctx.voiceSnippet = voiceCaptionTail.slice(-2500);
+      if (companionDecisions.trim()) ctx.companionDecisions = companionDecisions.slice(-1200);
+      if (queueAgentAvailable !== null) ctx.queueAgentAvailable = queueAgentAvailable;
+      if (ivrSessionUnresolved) ctx.ivrSessionUnresolved = true;
+      return ctx;
+    },
+    [
+      userRole,
+      activeClientId,
+      activeClientName,
+      mode,
+      companionFlow,
+      companionSummary,
+      voiceCaptionTail,
+      companionDecisions,
+      queueAgentAvailable,
+      ivrSessionUnresolved,
+    ]
+  );
 
   const openComposerFromHash = (actionId: string) => {
+    if (actionId === "contact") {
+      openCompanion();
+      appendCompanionNote("User opened Contact us via #contact.");
+      return;
+    }
     setComposerChannel(HASH_TO_COMPOSER[actionId] || "dm");
     setComposerRecipient(null);
     setComposerOpen(true);
@@ -78,6 +165,22 @@ export function ChatPanel() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id ?? null));
   }, [supabase]);
+
+  useEffect(() => {
+    if (!composerRequest) return;
+    setComposerChannel(composerRequest.channel);
+    setComposerRecipient(null);
+    setComposerPrefill(composerRequest.prefill ?? null);
+    setComposerOpen(true);
+    clearComposerRequest();
+  }, [composerRequest, clearComposerRequest]);
+
+  useEffect(() => {
+    if (!pendingUserComposerText) return;
+    setInput((prev) => (prev ? `${prev}\n${pendingUserComposerText}` : pendingUserComposerText));
+    setPendingUserComposerText(null);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [pendingUserComposerText, setPendingUserComposerText]);
 
   useEffect(() => {
     if (!activeClientId) {
@@ -149,6 +252,7 @@ export function ChatPanel() {
     { id: "reminder", label: "Set reminder", icon: "⏰" },
     { id: "appointment", label: "Schedule appointment", icon: "📅" },
     { id: "call", label: "Call", icon: "📞" },
+    { id: "contact", label: "Contact / voice", icon: "🎧" },
   ];
 
   useEffect(() => {
@@ -255,6 +359,7 @@ export function ChatPanel() {
     if (m === "evv") return "evv";
     if (m === "customer_service") return "customer_service";
     if (m === "eligibility") return "eligibility";
+    if (m === "contact_us") return "general";
     return "general";
   }
 
@@ -293,13 +398,7 @@ export function ChatPanel() {
         effectiveSessionId = sessionId;
       }
       const inFlow = !!(flowContext?.flowId && !flowContext.completed);
-      const userContext = {
-        role: userRole || undefined,
-        activeClientId: activeClientId || undefined,
-        activeClientName: activeClientName || undefined,
-        mode: mode || undefined,
-        session_id: effectiveSessionId || undefined,
-      };
+      const userContext = buildChatUserContext(effectiveSessionId);
       const mcpRes = await fetch(`${apiBase}/api/mcp`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, Accept: "application/json" },
@@ -326,6 +425,12 @@ export function ChatPanel() {
   async function sendMessage() {
     if ((!input.trim() && attachments.length === 0) || loading) return;
     const userMsg: Message = { role: "user", content: input.trim() || "(attachment)", attachments: attachments.length ? [...attachments] : undefined };
+    setLastChatSnippetForCompanion(userMsg.content.slice(-500));
+    if (messageOpensCompanionContact(userMsg.content)) {
+      openCompanion();
+      appendCompanionNote(`Chat indicated support: ${userMsg.content.slice(0, 240)}`);
+    }
+    let resolvedSessionId: string | null | undefined = currentSessionId;
     setMessages((m) => [
       ...m.map((x) => (x.role === "assistant" ? { ...x, quickReplies: undefined } : x)),
       userMsg,
@@ -362,16 +467,11 @@ export function ChatPanel() {
         openChatSession(sessionId);
         effectiveSessionId = sessionId;
       }
+      resolvedSessionId = effectiveSessionId;
 
       const history = messages.map(({ role, content }) => ({ role, content }));
       const useTools = userRole === "csr_admin" || userRole === "management_admin";
-      const userContext = {
-        role: userRole || undefined,
-        activeClientId: activeClientId || undefined,
-        activeClientName: activeClientName || undefined,
-        mode: mode || undefined,
-        session_id: effectiveSessionId || undefined,
-      };
+      const userContext = buildChatUserContext(effectiveSessionId);
       const body = JSON.stringify({
         message: userMsg.content,
         history: messages.map(({ role, content }) => ({ role, content })),
@@ -506,12 +606,7 @@ export function ChatPanel() {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
             body: JSON.stringify({
               message: userMsg.content,
-              userContext: {
-                role: userRole || undefined,
-                activeClientId: activeClientId || undefined,
-                activeClientName: activeClientName || undefined,
-                mode: mode || undefined,
-              },
+              userContext: buildChatUserContext(resolvedSessionId ?? currentSessionId),
               ...(inFlowCatch && flowContext ? { flowContext } : {}),
             }),
           });
@@ -545,8 +640,6 @@ export function ChatPanel() {
     }
   }
 
-  const isAdmin = userRole === "csr_admin" || userRole === "management_admin";
-
   let lastQuickReplyIdx = -1;
   messages.forEach((m, i) => {
     if (m.role === "assistant" && m.quickReplies && m.quickReplies.length > 0) lastQuickReplyIdx = i;
@@ -556,7 +649,7 @@ export function ChatPanel() {
     <div className="flex flex-col flex-1 min-h-0 border border-slate-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-black shadow-sm">
       {mcpLimitedMode && (
         <div className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 dark:bg-zinc-800/80 border-b border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-slate-300 text-sm">
-          <span>That reply used quick commands — the live AI stream wasn't available for that request.</span>
+          <span>That reply used quick commands — the live AI stream was not available for that request.</span>
           <button type="button" onClick={() => setMcpLimitedMode(false)} className="text-emerald-600 dark:text-emerald-400 hover:underline shrink-0">Dismiss</button>
         </div>
       )}
@@ -594,7 +687,22 @@ export function ChatPanel() {
           </div>
         </div>
       )}
-      <div className="flex items-center justify-end gap-2 px-3 py-1.5 border-b border-slate-200 dark:border-zinc-700 bg-slate-50/80 dark:bg-zinc-900/40 shrink-0">
+      <div className="flex items-stretch gap-2 px-2 sm:px-3 py-2 border-b border-slate-200 dark:border-zinc-700 bg-slate-50/80 dark:bg-zinc-900/40 shrink-0 min-h-11">
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() =>
+              openPIP("expand", {
+                title: "Calls in queue",
+                content: <CsrCallQueuePanel />,
+              })
+            }
+            className="shrink-0 self-center px-3 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-zinc-600 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 min-h-10"
+          >
+            Calls in queue
+          </button>
+        )}
+        <div className="flex-1 min-w-0" aria-hidden="true" />
         <button
           type="button"
           onClick={() => {
@@ -602,7 +710,7 @@ export function ChatPanel() {
             resetChat();
           }}
           disabled={loading}
-          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-50 text-lg font-medium leading-none"
+          className="inline-flex items-center justify-center min-w-10 min-h-10 w-10 h-10 shrink-0 self-center rounded-lg border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-50 text-lg font-medium leading-none"
           title="New chat"
           aria-label="New chat"
         >
@@ -773,7 +881,10 @@ export function ChatPanel() {
         {(userRole === "csr_admin" || userRole === "management_admin") && (
           <button
             type="button"
-            onClick={() => openPIP("eligibility")}
+            onClick={() => {
+              openPIP("eligibility");
+              openCompanion();
+            }}
             className="p-2 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-zinc-700"
             title="Eligibility"
             aria-label="Eligibility"
@@ -853,7 +964,7 @@ export function ChatPanel() {
             placeholder={
               userRole === "csr_admin" || userRole === "management_admin"
                 ? "Chat with Kloudy. Client help, eligibility, documents. Use @ for users, # for actions."
-                : "Type a message... Use @ for users, # for actions (dm, email, reminder, appointment, call)"
+                : "Type a message... Use @ for users, # for actions (dm, email, reminder, appointment, call, contact)"
             }
             rows={1}
             className="w-full min-h-[40px] max-h-[200px] rounded-lg border border-slate-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm resize-y overflow-y-auto"
@@ -895,9 +1006,13 @@ export function ChatPanel() {
       </div>
       <NewMessageComposer
         open={composerOpen}
-        onClose={() => setComposerOpen(false)}
+        onClose={() => {
+          setComposerOpen(false);
+          setComposerPrefill(null);
+        }}
         initialChannel={composerChannel}
         initialRecipient={composerRecipient}
+        initialPrefill={composerPrefill}
       />
     </div>
   );

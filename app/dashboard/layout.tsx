@@ -7,11 +7,7 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { AppProvider } from "@/context/AppContext";
 import { Toolbar } from "@/components/Toolbar";
-import { ChatPanel } from "@/components/ChatPanel";
-import { CustomerServiceSidePanel } from "@/components/CustomerServiceSidePanel";
-import { ChatHistorySidebar } from "@/components/ChatHistorySidebar";
-import { RightSidebar } from "@/components/RightSidebar";
-import { DashboardMainContent } from "@/components/DashboardMainContent";
+import { DashboardShell } from "@/components/DashboardShell";
 import { PIPContainer } from "@/components/PIPContainer";
 
 export default function DashboardLayout({
@@ -74,6 +70,8 @@ export default function DashboardLayout({
 
   const isProfilePage = pathname === "/dashboard/profile";
   const isPendingApprovalPage = pathname === "/dashboard/pending-approval";
+  const isCustomerSupportPage = pathname === "/dashboard/customer-support";
+  const isVoiceLabPage = pathname === "/dashboard/voice-lab";
 
   return (
     <AuthGuard>
@@ -81,20 +79,24 @@ export default function DashboardLayout({
         <div className="min-h-screen flex flex-col bg-white dark:bg-black">
           <Toolbar onSettingsClick={() => setSettingsOpen(true)} />
           <main className="flex-1 flex min-h-0 overflow-hidden">
-            {isProfilePage ? (
-              <div className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 overflow-auto">
+            {isPendingApprovalPage ? (
+              <div className="flex-1 overflow-auto">
                 {children}
               </div>
-            ) : isPendingApprovalPage ? (
-              <div className="flex-1 overflow-auto">
+            ) : isVoiceLabPage ? (
+              <div className="flex-1 flex min-h-0 min-w-0 overflow-auto">
                 {children}
               </div>
             ) : (
               <>
-                <div className="flex-1 flex min-h-0 min-w-0">
-                  <DashboardMainContent />
-                  <RightSidebar />
-                </div>
+                <DashboardShell
+                  inlinePage={
+                    isProfilePage ? (
+                      <div className="flex-1 overflow-auto max-w-4xl w-full mx-auto px-4 py-6">{children}</div>
+                    ) : undefined
+                  }
+                />
+                {isCustomerSupportPage ? children : null}
               </>
             )}
           </main>

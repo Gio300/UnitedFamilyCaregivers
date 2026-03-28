@@ -47,6 +47,10 @@ CREATE POLICY "Users manage own reminders" ON public.reminders FOR ALL USING (au
 
 Or run migrations via GitHub Actions (Push Supabase Migrations workflow) or locally: `supabase db push --db-url "$SUPABASE_DATABASE_URL" --yes`. Migrations use unique timestamps (e.g. `20240319120001_add_onboarding_notes_reminders.sql`).
 
+**Support call queue (CSR pickup):** Apply `supabase/migrations/20240327120022_support_call_queue.sql` (then optional `supabase/record_migrations_022_support_queue.sql`). Enables `support_call_queue` + RLS + Realtime for Companion queue updates.
+
+**AI Gateway (voice):** In `ai-gateway/.env`, set `LIVEKIT_AGENT_NAME` to the exact LiveKit Cloud agent name (e.g. `Kloudy`). For allowlisted outbound SIP to UFC lines, set `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` and optionally `OUTBOUND_DIAL_ALLOWLIST` (defaults include `+18334326588` and `+18005252395`).
+
 ### Supabase CLI on Windows (local, no git push)
 
 **Note:** `npm install -g supabase` is not supported by the Supabase team. Use the installer script or the GitHub release tarball.
@@ -208,3 +212,8 @@ When admins (CSR/admin) select a profile from the Options > Profiles panel:
 - **Right panel** — Shows "Viewing: [Client Name]" or "No profile selected" in the Options view.
 - **AI context** — The AI receives `activeClientName` and `mode` and may mention whose profile is being discussed.
 - **Notes** — The Notes bar (AutoNotesBar) shows activities for the active client; "This chat" scope filters by the current chat session.
+
+## Companion orchestrate & LiveKit HTTP stubs (ai-gateway)
+
+- **`POST /api/companion-orchestrate`** — Requires the same Supabase JWT as other gateway routes; ensure the deployed gateway runs a current `server.js` and Ollama is reachable if you use local LLM.
+- **`GET /api/voice/onboarding-status`**, **`POST /api/voice/onboarding-draft`** — Stubs for future LiveKit Actions; optional **`LIVEKIT_HTTP_TOOL_SECRET`** is documented in `docs/LIVEKIT_KLOUDY_SETUP.md` for hardening.

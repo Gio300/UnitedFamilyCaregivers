@@ -1,6 +1,42 @@
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
-const MODEL_FAST = process.env.OLLAMA_MODEL_FAST || process.env.OLLAMA_MODEL || "llama3.2:3b";
+const MODEL_FAST =
+  process.env.OLLAMA_MODEL_FAST || process.env.OLLAMA_MODEL || "llama3.2";
 const MODEL_SMART = process.env.OLLAMA_MODEL_SMART || "llama3.3";
+
+/** Prefer MODEL_FAST; if not installed, pick first tag from Ollama (avoids 404 when name/tag differs). */
+let resolvedFastModelCache = null;
+async function getResolvedFastModel() {
+  if (resolvedFastModelCache) return resolvedFastModelCache;
+  const preferred = MODEL_FAST;
+  try {
+    const r = await fetch(`${OLLAMA_URL}/api/tags`);
+    if (!r.ok) throw new Error("tags");
+    const data = await r.json();
+    const names = (data.models || []).map((m) => m.name).filter(Boolean);
+    if (names.length === 0) {
+      resolvedFastModelCache = preferred;
+      return preferred;
+    }
+    if (names.includes(preferred)) {
+      resolvedFastModelCache = preferred;
+      return preferred;
+    }
+    const hit =
+      names.find((n) => n.startsWith(preferred + ":")) ||
+      names.find((n) => n.split(":")[0] === preferred.split(":")[0]) ||
+      names[0];
+    if (hit && hit !== preferred) {
+      console.warn(
+        `[ollama] "${preferred}" not in ollama list; using "${hit}". Set OLLAMA_MODEL_FAST or run: ollama pull ${preferred}`
+      );
+    }
+    resolvedFastModelCache = hit || preferred;
+    return resolvedFastModelCache;
+  } catch {
+    resolvedFastModelCache = preferred;
+    return preferred;
+  }
+}
 
 const SYSTEM_PROMPT = `You are Kloudy, the AI assistant for United Family Caregivers (NV Care Solutions Inc.) and Kloudy Kare. When users get emails from Kloudy Kare, they know it's from you. Serve Nevada and Arizona.
 
@@ -60,10 +96,11 @@ async function generate(prompt, history = [], userContext = null) {
     { role: "user", content: prompt },
   ];
 
+  const model = await getResolvedFastModel();
   const response = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL_FAST, messages, stream: false }),
+    body: JSON.stringify({ model, messages, stream: false }),
   });
 
   if (!response.ok) {
@@ -83,10 +120,11 @@ async function generateStream(prompt, history = [], userContext = null, onToken)
     { role: "user", content: prompt },
   ];
 
+  const model = await getResolvedFastModel();
   const response = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL_FAST, messages, stream: true }),
+    body: JSON.stringify({ model, messages, stream: true }),
   });
 
   if (!response.ok) {
@@ -184,8 +222,9 @@ async function generateWithTools(prompt, history, userContext, tools, executeToo
     { role: "user", content: prompt },
   ];
 
+  const fastModel = await getResolvedFastModel();
   for (let i = 0; i < maxIterations; i++) {
-    const body = { model: MODEL_FAST, messages, stream: false };
+    const body = { model: fastModel, messages, stream: false };
     if (tools && tools.length > 0) body.tools = tools;
 
     const response = await fetch(`${OLLAMA_URL}/api/chat`, {
@@ -311,7 +350,7 @@ ${(userMessage || "").slice(0, 4000)}
 
 JSON only:`;
 
-  const response = await generateWithModel(MODEL_FAST, prompt, []);
+  const response = await generateWithModel(await getResolvedFastModel(), prompt, []);
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     return {
@@ -339,6 +378,150 @@ JSON only:`;
   }
 }
 
+const COMPANION_GUIDANCE_SYSTEM = `You write short on-screen hints for someone waiting on hold for United Family Caregivers customer service (voice + Companion sidebar).
+Rules: Output plain sentences only. No markdown, no bullet lists, no JSON, no emojis. At most 4 short sentences.
+Always be honest that they are waiting for a live agent unless context explicitly says a rep joined.
+Remind them that sharing details with you helps the representative and does not remove them from the queue.
+You may mention they can use the main text chat to see updates, and they can use Schedule a call if they prefer a call-back.`;
+
+async function generateCompanionGuidance(contextPayload) {
+  const userContent = `Session context (JSON):\n${JSON.stringify(contextPayload)}\n\nWrite the next Companion guidance message for the user.`;
+  const model = await getResolvedFastModel();
+  const messages = [
+    { role: "system", content: COMPANION_GUIDANCE_SYSTEM },
+    { role: "user", content: userContent },
+  ];
+  const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages, stream: false }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Ollama error: ${response.status} ${err}`);
+  }
+  const data = await response.json();
+  const raw = (data.message?.content || "").trim();
+  return raw.slice(0, 1200);
+}
+
+const COMPANION_ORCHESTRATE_SYSTEM = `You plan Companion sidebar hints for United Family Caregivers (caregiving app). Main chat runs tools; Companion only suggests next steps — do not duplicate long answers from chat.
+
+Return ONLY valid JSON (no markdown):
+{"guidance":"string","actions":[{"id":"snake_id","label":"short button label","chatPayload":"optional","channel":null}],"needsMcp":false,"mcpMessage":null}
+
+- guidance: plain text, max 4 short sentences, no bullets/markdown.
+- actions: 0 to 5 items. Use chatPayload to prefill main chat (e.g. **start checklist**). channel must be one of: "dm","email","reminder","appointment","call" or omit/null.
+- needsMcp: true if a short MCP message could fetch checklist/tool context.
+- mcpMessage: short user-style line for MCP (e.g. **start checklist** or a concrete tool ask).`;
+
+function normalizeOrchestrateActions(raw) {
+  const channels = new Set(["dm", "email", "reminder", "appointment", "call"]);
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((a, i) => {
+      if (!a || typeof a !== "object") return null;
+      const id = typeof a.id === "string" && a.id.trim() ? a.id.trim().slice(0, 64) : `action_${i}`;
+      const label = typeof a.label === "string" && a.label.trim() ? a.label.trim().slice(0, 80) : "Next step";
+      const chatPayload = typeof a.chatPayload === "string" ? a.chatPayload.slice(0, 2000) : undefined;
+      let channel = a.channel;
+      if (channel != null && typeof channel === "string" && channels.has(channel)) {
+        channel = channel;
+      } else {
+        channel = undefined;
+      }
+      const out = { id, label, ...(chatPayload ? { chatPayload } : {}), ...(channel ? { channel } : {}) };
+      return out;
+    })
+    .filter(Boolean);
+}
+
+async function generateCompanionOrchestrate(contextPayload) {
+  const userContent = `Context JSON:\n${JSON.stringify(contextPayload)}\n\nReturn JSON only.`;
+  const model = await getResolvedFastModel();
+  const messages = [
+    { role: "system", content: COMPANION_ORCHESTRATE_SYSTEM },
+    { role: "user", content: userContent },
+  ];
+  const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages, stream: false }),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Ollama error: ${response.status} ${err}`);
+  }
+  const data = await response.json();
+  const raw = (data.message?.content || "").trim();
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return {
+      guidance: "Use Quick actions or the main chat for the next step.",
+      actions: [],
+      needsMcp: false,
+      mcpMessage: null,
+    };
+  }
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    const guidance = String(parsed.guidance || "").trim().slice(0, 1200);
+    const actions = normalizeOrchestrateActions(parsed.actions);
+    const needsMcp = !!parsed.needsMcp;
+    const mcpMessage =
+      typeof parsed.mcpMessage === "string" && parsed.mcpMessage.trim() ? parsed.mcpMessage.trim().slice(0, 500) : null;
+    return {
+      guidance: guidance || "Use the main chat or voice below if you need help.",
+      actions,
+      needsMcp,
+      mcpMessage,
+    };
+  } catch {
+    return {
+      guidance: "Use Quick actions (+) or type in main chat.",
+      actions: [],
+      needsMcp: false,
+      mcpMessage: null,
+    };
+  }
+}
+
+async function refineCompanionAfterMcp({ priorGuidance, priorActions, mcpResponseText }) {
+  const model = await getResolvedFastModel();
+  const system = `You refine Companion JSON after an MCP tool response. Return ONLY valid JSON:
+{"guidance":"string","actions":[same shape as before]}
+Plain guidance, max 3 sentences. Actions: 0-4 items.`;
+  const userContent = `Prior guidance: ${priorGuidance}\nPrior actions JSON: ${JSON.stringify(priorActions)}\nMCP result (truncated):\n${(mcpResponseText || "").slice(0, 2000)}\n\nMerged JSON only:`;
+  const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userContent },
+      ],
+      stream: false,
+    }),
+  });
+  if (!response.ok) {
+    return { guidance: priorGuidance, actions: priorActions };
+  }
+  const data = await response.json();
+  const raw = (data.message?.content || "").trim();
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return { guidance: priorGuidance, actions: priorActions };
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      guidance: String(parsed.guidance || priorGuidance).trim().slice(0, 1200) || priorGuidance,
+      actions: normalizeOrchestrateActions(parsed.actions).length ? normalizeOrchestrateActions(parsed.actions) : priorActions,
+    };
+  } catch {
+    return { guidance: priorGuidance, actions: priorActions };
+  }
+}
+
 module.exports = {
   generate,
   generateStream,
@@ -346,6 +529,9 @@ module.exports = {
   extractCallNoteFromText,
   generateActivitySummary,
   generateAutoResponse,
+  generateCompanionGuidance,
+  generateCompanionOrchestrate,
+  refineCompanionAfterMcp,
   flowAssist,
   MODEL_FAST,
   MODEL_SMART,

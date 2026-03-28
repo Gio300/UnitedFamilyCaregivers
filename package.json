@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 7503",
+    "dev:7512": "next dev -p 7512",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -17,7 +18,8 @@
     "livekit-server-sdk": "^2.15.0",
     "next": "16.2.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-resizable-panels": "^4.7.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

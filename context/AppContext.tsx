@@ -2,8 +2,43 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getApiBase } from "@/lib/api";
 
-export type AppMode = "chat" | "notes" | "messenger" | "profiles" | "evv" | "customer_service" | "appointments" | "supervisor" | "eligibility";
+export type AppMode =
+  | "chat"
+  | "notes"
+  | "messenger"
+  | "profiles"
+  | "evv"
+  | "customer_service"
+  | "appointments"
+  | "supervisor"
+  | "eligibility"
+  | "contact_us";
+
+/** Must match `ComposerChannel` in NewMessageComposer (avoid circular import). */
+export type ComposerRequestChannel = "dm" | "email" | "reminder" | "appointment" | "call";
+
+/** Optional fields to prefill when opening the message composer from context shortcuts. */
+export type ComposerPrefill = {
+  dmBody?: string;
+  emailSubject?: string;
+  emailBody?: string;
+  reminderText?: string;
+  aptTitle?: string;
+  aptNotes?: string;
+};
+
+export type CompanionSuggestedAction = {
+  id: string;
+  label: string;
+  chatPayload?: string;
+  channel?: ComposerRequestChannel;
+  prefill?: ComposerPrefill;
+};
+
+/** Companion scheduling flows (fed into chat userContext). */
+export type CompanionFlow = "appointment_intent" | "callback_requested";
 
 export type PIPType = "settings" | "eligibility" | "document" | "expand" | "activity" | "supervisor_approval" | "message_center" | null;
 
@@ -63,6 +98,50 @@ interface AppContextValue {
   setLeftSidebarOpen: (v: boolean) => void;
   rightSidebarOpen: boolean;
   setRightSidebarOpen: (v: boolean) => void;
+  companionFlow: CompanionFlow | null;
+  setCompanionFlow: (f: CompanionFlow | null) => void;
+  companionSummary: string;
+  voiceCaptionTail: string;
+  companionDecisions: string;
+  appendCompanionNote: (line: string) => void;
+  appendVoiceCaption: (line: string) => void;
+  appendCompanionDecision: (line: string) => void;
+  clearCompanionContext: () => void;
+  /** Bumps when activity_log may have new rows (refetch AutoNotesBar). */
+  activityLogRefreshKey: number;
+  /** LiveKit voice session connected (Companion guidance visible). */
+  companionVoiceSessionActive: boolean;
+  setCompanionVoiceSessionActive: (v: boolean) => void;
+  companionGuidance: { history: string[]; index: number };
+  pushCompanionGuidance: (text: string) => void;
+  companionGuidanceGoBack: () => void;
+  companionGuidanceGoForward: () => void;
+  resetCompanionGuidance: () => void;
+  openCompanion: () => void;
+  /** Pending composer open from shortcuts (Companion, Quick Actions). Cleared when ChatPanel opens the composer. */
+  composerRequest: { channel: ComposerRequestChannel; prefill?: ComposerPrefill } | null;
+  requestComposerChannel: (c: ComposerRequestChannel, prefill?: ComposerPrefill) => void;
+  clearComposerRequest: () => void;
+  /** Fills the main chat input once (user message), then cleared. */
+  pendingUserComposerText: string | null;
+  setPendingUserComposerText: (t: string | null) => void;
+  companionSuggestedActions: CompanionSuggestedAction[];
+  setCompanionSuggestedActions: (a: CompanionSuggestedAction[]) => void;
+  applyCompanionAction: (action: CompanionSuggestedAction) => void;
+  /** Last user chat text (tail) for Companion orchestration — updated when the user sends from main chat. */
+  lastChatSnippetForCompanion: string;
+  setLastChatSnippetForCompanion: (s: string) => void;
+  /**
+   * True when a CSR is available to take the live queue call for this session.
+   * false = none available (stub default on localhost until gateway wires this).
+   * null = unknown — treat like "may have agents" and do not offer callback-only escalation.
+   */
+  queueAgentAvailable: boolean | null;
+  setQueueAgentAvailable: (v: boolean | null) => void;
+  /** User indicated voice IVR did not resolve their issue (e.g. button in voice panel). */
+  ivrSessionUnresolved: boolean;
+  markIvrSessionUnresolved: () => void;
+  resetIvrSessionUnresolved: () => void;
   chatSessions: ChatSession[];
   addChatSession: (session: ChatSession) => void;
   updateChatSession: (id: string, updates: Partial<Pick<ChatSession, "title" | "messages" | "preview">>) => void;
@@ -76,9 +155,16 @@ interface AppContextValue {
   setAutoNotesScope: (scope: "this_chat" | "all") => void;
   pendingAssistantMessage: string | null;
   setPendingAssistantMessage: (msg: string | null) => void;
+  /** LiveKit cs-voice room name while in queue (for Realtime + polling). */
+  activeSupportRoomName: string | null;
+  setActiveSupportRoomName: (name: string | null) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
+
+function isValidUuid(s: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -95,6 +181,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [chatResetKey, setChatResetKey] = useState(0);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
+  const [companionFlow, setCompanionFlow] = useState<CompanionFlow | null>(null);
+  const [companionSummary, setCompanionSummary] = useState("");
+  const [voiceCaptionTail, setVoiceCaptionTail] = useState("");
+  const [companionDecisions, setCompanionDecisions] = useState("");
+  const [composerRequest, setComposerRequest] = useState<{
+    channel: ComposerRequestChannel;
+    prefill?: ComposerPrefill;
+  } | null>(null);
+  const [pendingUserComposerText, setPendingUserComposerText] = useState<string | null>(null);
+  const [companionSuggestedActions, setCompanionSuggestedActions] = useState<CompanionSuggestedAction[]>([]);
+  const [lastChatSnippetForCompanion, setLastChatSnippetForCompanion] = useState("");
+  /** null = unknown; true when a rep claimed this session’s queue row; false when known none. */
+  const [queueAgentAvailable, setQueueAgentAvailable] = useState<boolean | null>(null);
+  const [activeSupportRoomName, setActiveSupportRoomName] = useState<string | null>(null);
+  const [ivrSessionUnresolved, setIvrSessionUnresolved] = useState(false);
+  const [activityLogRefreshKey, setActivityLogRefreshKey] = useState(0);
+  const [companionVoiceSessionActive, setCompanionVoiceSessionActiveState] = useState(false);
+  const [companionGuidance, setCompanionGuidance] = useState<{ history: string[]; index: number }>({
+    history: [],
+    index: -1,
+  });
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const chatSessionsRef = useRef<ChatSession[]>([]);
   chatSessionsRef.current = chatSessions;
@@ -104,12 +211,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string }[]>([]);
   const [autoNotesScope, setAutoNotesScopeState] = useState<"this_chat" | "all">("all");
   const [pendingAssistantMessage, setPendingAssistantMessage] = useState<string | null>(null);
+  const activeClientIdRef = useRef<string | null>(null);
+  const currentSessionIdRef = useRef<string | null>(null);
+  activeClientIdRef.current = activeClientId;
+  currentSessionIdRef.current = currentSessionId;
 
   const openChatSession = useCallback((id: string) => {
     setCurrentSessionIdState(id);
   }, []);
-
-  const isValidUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
   const addChatSession = useCallback((session: ChatSession) => {
     setChatSessions((prev) => {
@@ -310,6 +419,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [setTheme, setAccentColor, setDeviceType, setTextSize]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const syncMobileClass = () => {
+      document.body.classList.toggle("ufci-mobile", mq.matches);
+    };
+    syncMobileClass();
+    mq.addEventListener("change", syncMobileClass);
+    return () => {
+      mq.removeEventListener("change", syncMobileClass);
+      document.body.classList.remove("ufci-mobile");
+    };
+  }, []);
+
+  useEffect(() => {
     const tpx = Math.min(24, Math.max(12, parseInt(localStorage.getItem("ufci_text_scale_px") || "16", 10) || 16));
     const ps = Math.min(1.5, Math.max(0.75, parseFloat(localStorage.getItem("ufci_page_scale") || "1") || 1));
     document.documentElement.style.setProperty("--ufci-text-base", `${tpx}px`);
@@ -408,6 +531,206 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setExpandContent(null);
   }, []);
 
+  const MAX_COMPANION_SUMMARY = 4000;
+  const MAX_VOICE_TAIL = 2500;
+  const MAX_COMPANION_DECISIONS = 1500;
+  const MAX_COMPANION_GUIDANCE = 20;
+
+  const bumpActivityLog = useCallback(() => {
+    setActivityLogRefreshKey((k) => k + 1);
+  }, []);
+
+  const resetCompanionGuidance = useCallback(() => {
+    setCompanionGuidance({ history: [], index: -1 });
+  }, []);
+
+  const setCompanionVoiceSessionActive = useCallback(
+    (v: boolean) => {
+      setCompanionVoiceSessionActiveState(v);
+      if (!v) {
+        resetCompanionGuidance();
+        setActiveSupportRoomName(null);
+        setQueueAgentAvailable(false);
+      }
+    },
+    [resetCompanionGuidance]
+  );
+
+  const pushCompanionGuidance = useCallback((text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    setCompanionGuidance(({ history, index }) => {
+      const base = index >= 0 && index < history.length ? history.slice(0, index + 1) : [...history];
+      base.push(t);
+      const nh =
+        base.length > MAX_COMPANION_GUIDANCE ? base.slice(-MAX_COMPANION_GUIDANCE) : base;
+      return { history: nh, index: nh.length - 1 };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!activeSupportRoomName || !companionVoiceSessionActive) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`support_queue_${activeSupportRoomName.replace(/[^a-zA-Z0-9_-]/g, "_")}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "support_call_queue",
+          filter: `room_name=eq.${activeSupportRoomName}`,
+        },
+        (payload) => {
+          const row = payload.new as { status?: string } | null;
+          if (row?.status === "claimed") {
+            setQueueAgentAvailable(true);
+            pushCompanionGuidance(
+              "A representative has claimed your place in line and should join your voice room shortly."
+            );
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [activeSupportRoomName, companionVoiceSessionActive, pushCompanionGuidance]);
+
+  useEffect(() => {
+    if (!activeSupportRoomName || !companionVoiceSessionActive) return;
+    const apiBase = getApiBase();
+    if (!apiBase) return;
+    let cancelled = false;
+    const tick = async () => {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const jwt = session?.access_token;
+      if (!jwt || cancelled) return;
+      const u = `${apiBase.replace(/\/+$/, "")}/api/support-queue/caller-status?roomName=${encodeURIComponent(activeSupportRoomName)}`;
+      try {
+        const res = await fetch(u, { headers: { Authorization: `Bearer ${jwt}` } });
+        const body = (await res.json().catch(() => ({}))) as { row?: { status?: string } };
+        if (cancelled) return;
+        if (body.row?.status === "claimed") {
+          setQueueAgentAvailable(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 12000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [activeSupportRoomName, companionVoiceSessionActive]);
+
+  const companionGuidanceGoBack = useCallback(() => {
+    setCompanionGuidance(({ history, index }) => ({
+      history,
+      index: index > 0 ? index - 1 : index,
+    }));
+  }, []);
+
+  const companionGuidanceGoForward = useCallback(() => {
+    setCompanionGuidance(({ history, index }) => ({
+      history,
+      index: index < history.length - 1 ? index + 1 : index,
+    }));
+  }, []);
+
+  const appendCompanionNote = useCallback(
+    (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      setCompanionSummary((prev) => {
+        const next = prev ? `${prev}\n${trimmed}` : trimmed;
+        return next.length > MAX_COMPANION_SUMMARY ? next.slice(-MAX_COMPANION_SUMMARY) : next;
+      });
+      void (async () => {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+        const payload: Record<string, unknown> = {
+          user_id: user.id,
+          action_type: "companion_note",
+          details: { message: trimmed },
+          client_id: activeClientIdRef.current ?? null,
+        };
+        const sid = currentSessionIdRef.current;
+        if (sid && isValidUuid(sid)) payload.session_id = sid;
+        const { error } = await supabase.from("activity_log").insert(payload);
+        if (!error) bumpActivityLog();
+      })();
+    },
+    [bumpActivityLog]
+  );
+
+  const appendVoiceCaption = useCallback((line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    setVoiceCaptionTail((prev) => {
+      const next = prev ? `${prev}\n${trimmed}` : trimmed;
+      return next.length > MAX_VOICE_TAIL ? next.slice(-MAX_VOICE_TAIL) : next;
+    });
+  }, []);
+
+  const appendCompanionDecision = useCallback((line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    setCompanionDecisions((prev) => {
+      const next = prev ? `${prev}\n${trimmed}` : trimmed;
+      return next.length > MAX_COMPANION_DECISIONS ? next.slice(-MAX_COMPANION_DECISIONS) : next;
+    });
+  }, []);
+
+  const markIvrSessionUnresolved = useCallback(() => {
+    setIvrSessionUnresolved(true);
+  }, []);
+
+  const resetIvrSessionUnresolved = useCallback(() => {
+    setIvrSessionUnresolved(false);
+  }, []);
+
+  const clearCompanionContext = useCallback(() => {
+    setCompanionFlow(null);
+    setCompanionSummary("");
+    setVoiceCaptionTail("");
+    setCompanionDecisions("");
+    setIvrSessionUnresolved(false);
+  }, []);
+
+  const openCompanion = useCallback(() => {
+    setRightSidebarOpen(true);
+  }, []);
+
+  const requestComposerChannel = useCallback((c: ComposerRequestChannel, prefill?: ComposerPrefill) => {
+    setComposerRequest({ channel: c, ...(prefill && Object.keys(prefill).length ? { prefill } : {}) });
+  }, []);
+
+  const clearComposerRequest = useCallback(() => {
+    setComposerRequest(null);
+  }, []);
+
+  const applyCompanionAction = useCallback(
+    (action: CompanionSuggestedAction) => {
+      if (action.channel) {
+        requestComposerChannel(action.channel, action.prefill);
+        return;
+      }
+      if (action.chatPayload?.trim()) {
+        setPendingUserComposerText(action.chatPayload.trim());
+      }
+    },
+    [requestComposerChannel]
+  );
+
   return (
     <AppContext.Provider
       value={{
@@ -439,6 +762,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLeftSidebarOpen,
         rightSidebarOpen,
         setRightSidebarOpen,
+        companionFlow,
+        setCompanionFlow,
+        companionSummary,
+        voiceCaptionTail,
+        companionDecisions,
+        appendCompanionNote,
+        appendVoiceCaption,
+        appendCompanionDecision,
+        clearCompanionContext,
+        activityLogRefreshKey,
+        companionVoiceSessionActive,
+        setCompanionVoiceSessionActive,
+        companionGuidance,
+        pushCompanionGuidance,
+        companionGuidanceGoBack,
+        companionGuidanceGoForward,
+        resetCompanionGuidance,
+        openCompanion,
+        composerRequest,
+        requestComposerChannel,
+        clearComposerRequest,
+        pendingUserComposerText,
+        setPendingUserComposerText,
+        companionSuggestedActions,
+        setCompanionSuggestedActions,
+        applyCompanionAction,
+        lastChatSnippetForCompanion,
+        setLastChatSnippetForCompanion,
+        queueAgentAvailable,
+        setQueueAgentAvailable,
+        ivrSessionUnresolved,
+        markIvrSessionUnresolved,
+        resetIvrSessionUnresolved,
         chatSessions,
         addChatSession,
         updateChatSession,
@@ -452,6 +808,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAutoNotesScope: setAutoNotesScopeState,
         pendingAssistantMessage,
         setPendingAssistantMessage,
+        activeSupportRoomName,
+        setActiveSupportRoomName,
       }}
     >
       {children}
